@@ -23,9 +23,13 @@ Referencias:
 4.- cargar la interfaz UI: etiquetas, conexiones y funcionalidades
 5.- programar el resto de la aplicación
 """
-from pyqtgraph.Qt import QtGui, QtCore
+from PyQt5 import QtWidgets, QtCore, QtGui
+#from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
-import serial, time
+import serial, time, random, sys
+
+
+USE_SERIAL = False
 
 # Aqui comienzan los métodos del UI
 from control_ui import *  # importo todo lo declarado en la UI
@@ -61,13 +65,14 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi vent
         self.horizontalSlider_2.valueChanged.connect(self.leeLEDb)
         
         self.verticalSlider_1.valueChanged.connect(self.leeLEDx)
+        self.verticalSlider_2.valueChanged.connect(self.leeLEDy)
 
         #self.grafica = Canvas_grafica()
         #self.ui.grafica.addWidget(self.grafica)
         
            
     # Crear nuevas funcionalidades 
-    def muestreo(self):   # Mide periodicamente la tension
+    """ def muestreo(self):   # Mide periodicamente la tension
         ser.write(b'V\r')    # solicita el dato siguiente
         global curva, dataN, dataY, lastN, nuevoDato
         
@@ -93,20 +98,68 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi vent
 
                 #Actualizamos los datos y refrescamos la gráfica.
                 curva.setData(dataN, dataY)     # eje horizontal, eje vertical
-                QtGui.QApplication.processEvents()   
+                QtGui.QApplication.processEvents() """   
+
+    def muestreo(self):
+        global curva, dataN, dataY, lastN
+
+        if USE_SERIAL and ser:
+            try:
+                ser.write(b'V\r')
+                texto = ser.readline()
+
+                try:
+                    valor = float(texto)
+                except:
+                    return
+
+            except:
+                return
+
+        else:
+            # SIMULATION (fake sensor)
+            valor = 1.5 + 0.5 * random.random() 
+
+        self.lcdNumber_8.display(valor)
+
+        dataY.append(valor)
+        dataN.append(lastN)
+        lastN += 1
+
+        if len(dataN) > 2000:
+            dataN = dataN[1:]
+            dataY = dataY[1:]
+
+        curva.setData(dataN, dataY)
                                
     def leeLEDa(self,event):
         self.lcdNumber_1.display(event)   # se pasa EVENT del SLIDER al LCD
-        ser.write(bytes('A'+str(event)+'\r','ascii'))
-
+        if USE_SERIAL and ser:
+            ser.write(bytes('A'+str(event)+'\r','ascii'))
+        else:
+            print("A", event)
     def leeLEDb(self,event):
         self.lcdNumber_2.display(event)   # se pasa EVENT del SLIDER al LCD
-        ser.write(bytes('B'+str(event)+'\r','ascii'))
-
+        if USE_SERIAL and ser:
+            ser.write(bytes('A'+str(event)+'\r','ascii'))
+        else:
+            print("A", event)
     def leeLEDx(self,event):
         self.lcdNumber_6.display(event)   # se pasa EVENT del SLIDER al LCD
         #print(event)   # Muestra el dato EVENT en la pantalla de la consola 
-        ser.write(bytes('X'+str(event)+'\r','ascii'))
+        if USE_SERIAL and ser:
+            ser.write(bytes('A'+str(event)+'\r','ascii'))
+        else:
+            print("Solar", event)
+
+
+    def leeLEDy(self,event):
+        self.lcdNumber_7.display(event)   # se pasa EVENT del SLIDER al LCD
+        #print(event)   # Muestra el dato EVENT en la pantalla de la consola 
+        if USE_SERIAL and ser:
+            ser.write(bytes('A'+str(event)+'\r','ascii'))
+        else:
+            print("Diesel", event)
 
     def botonON(self):       
         global estado 
@@ -131,23 +184,33 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi vent
 # Abrimos un puerto serie
 #ser = serial.Serial('/dev/ttyUSB0', 115200)
 #ser = serial.Serial('/dev/ttyACM0', 115200)
-ser = serial.Serial('com3', 115200)
+#ser = serial.Serial('com3', 115200)
+
+ser = None
+
+if USE_SERIAL:
+    ser = serial.Serial('COM3', 115200)
+
 linea =b'off\r'       # El texto viaja en bytes, ejemplo de formato y de paso defino la variable. 
 estado = False
 
 # Pantalla auxiliar  
-app = QtGui.QApplication([])
-win = pg.GraphicsWindow(title="Gráfica en tiempo real")     #nombre de la ventana
+app = QtWidgets.QApplication([])
+win = pg.GraphicsLayoutWidget(title="Gráfica en tiempo real")     #nombre de la ventana
 p = win.addPlot(title="DDP en V")                #titulo de la grafica
 
 curva = p.plot(pen='y')
-p.setRange(yRange=[0, 3.2])
+# p.setRange(yRange=[0, 3.2])
 
 dataN = [] # Vector de muestras
 dataY = []  # Vector de valores
 lastN = 0
 num =0
-nuevoDato = 0
+nuevoDato = 0 
+
+print("Hola arnau")
+
+win.show()
 
 # Aqui se abre la UI
 if __name__ == "__main__":  
@@ -155,8 +218,12 @@ if __name__ == "__main__":
     window = MainWindow()
     window.show()
     app.exec_()
-    
 
+
+# test signal (IMPORTANT)
+curva.setData([0, 1, 2, 3], [0, 1, 0, 1])
+
+sys.exit(app.exec_())
 
 # Posproceso: cierra el LED y el puerto serie
 ser.write(b'off\r')
