@@ -32,8 +32,9 @@ import serial, time, random, sys
 USE_SERIAL = False
 
 # Aqui comienzan los métodos del UI
-from control_ui import *  # importo todo lo declarado en la UI
+from control_v1 import *  # importo todo lo declarado en la UI
 from PyQt5.QtCore import QTimer # importo temporizador
+
 
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi ventana
     def __init__(self, *args, **kwargs):
@@ -63,6 +64,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi vent
         # Se conecta el evento SLIDER con la acción leeLEDa donde estará LCD
         self.horizontalSlider_1.valueChanged.connect(self.leeLEDa)
         self.horizontalSlider_2.valueChanged.connect(self.leeLEDb)
+        self.horizontalSlider_3.valueChanged.connect(self.leeLEDc)
         
         self.verticalSlider_1.valueChanged.connect(self.leeLEDx)
         self.verticalSlider_2.valueChanged.connect(self.leeLEDy)
@@ -70,6 +72,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi vent
         #self.grafica = Canvas_grafica()
         #self.ui.grafica.addWidget(self.grafica)
         
+        self.solar = 0
+        self.diesel = 0
+
+        self.red = 0
+        self.blue = 0
+        self.green = 0
            
     # Crear nuevas funcionalidades 
     """ def muestreo(self):   # Mide periodicamente la tension
@@ -118,7 +126,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi vent
 
         else:
             # SIMULATION (fake sensor)
-            valor = 1.5 + 0.5 * random.random() 
+            valor = self.solar * random.random() 
 
         self.lcdNumber_8.display(valor)
 
@@ -137,13 +145,26 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi vent
         if USE_SERIAL and ser:
             ser.write(bytes('A'+str(event)+'\r','ascii'))
         else:
-            print("A", event)
+            print("Red", event)
+            self.red = event
+            self.update_consum()
     def leeLEDb(self,event):
         self.lcdNumber_2.display(event)   # se pasa EVENT del SLIDER al LCD
         if USE_SERIAL and ser:
             ser.write(bytes('A'+str(event)+'\r','ascii'))
         else:
-            print("A", event)
+            print("Blue", event)
+            self.blue = event
+            self.update_consum()
+    def leeLEDc(self,event):
+        self.lcdNumber_3.display(event)   # se pasa EVENT del SLIDER al LCD
+        if USE_SERIAL and ser:
+            ser.write(bytes('A'+str(event)+'\r','ascii'))
+        else:
+            print("Green", event)
+            self.green = event
+            self.update_consum()
+
     def leeLEDx(self,event):
         self.lcdNumber_6.display(event)   # se pasa EVENT del SLIDER al LCD
         #print(event)   # Muestra el dato EVENT en la pantalla de la consola 
@@ -151,15 +172,27 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi vent
             ser.write(bytes('A'+str(event)+'\r','ascii'))
         else:
             print("Solar", event)
-
-
+            self.solar = event
+            self.update_power()
     def leeLEDy(self,event):
-        self.lcdNumber_7.display(event)   # se pasa EVENT del SLIDER al LCD
+        self.lcdNumber_7.display(event)     # se pasa EVENT del SLIDER al LCD
         #print(event)   # Muestra el dato EVENT en la pantalla de la consola 
         if USE_SERIAL and ser:
             ser.write(bytes('A'+str(event)+'\r','ascii'))
         else:
             print("Diesel", event)
+            self.diesel = event
+            self.update_power()
+
+    def update_power(self):
+        powerIN = self.solar + self.diesel
+        self.lcdNumber_9.display(powerIN)     # se pasa EVENT del SLIDER al LCD
+        print("Power: ", powerIN)
+
+    def update_consum(self):
+        powerOUT = self.red+self.blue+self.green
+        self.lcdNumber_10.display(powerOUT)
+        print("Consum: ", powerOUT)
 
     def botonON(self):       
         global estado 
