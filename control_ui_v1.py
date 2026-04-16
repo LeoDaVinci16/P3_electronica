@@ -1,0 +1,137 @@
+# -*- coding: utf-8 -*-
+
+################################################################################
+## Form generated from reading UI file 'control_v1xlYYTt.ui'
+##
+## Created by: Qt User Interface Compiler version 5.15.2
+##
+## WARNING! All changes made in this file will be lost when recompiling UI file!
+################################################################################
+
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
+
+
+class Ui_MainWindow(object):
+    def setupUi(self, MainWindow):
+        if not MainWindow.objectName():
+            MainWindow.setObjectName(u"MainWindow")
+        MainWindow.resize(1200, 262)
+        self.actionMenu_2 = QAction(MainWindow)
+        self.actionMenu_2.setObjectName(u"actionMenu_2")
+        self.centralwidget = QWidget(MainWindow)
+        self.centralwidget.setObjectName(u"centralwidget")
+        self.pushButton_1 = QPushButton(self.centralwidget)
+        self.pushButton_1.setObjectName(u"pushButton_1")
+        self.pushButton_1.setGeometry(QRect(30, 10, 80, 23))
+        self.pushButton_2 = QPushButton(self.centralwidget)
+        self.pushButton_2.setObjectName(u"pushButton_2")
+        self.pushButton_2.setGeometry(QRect(30, 40, 80, 23))
+        self.verticalSlider_1 = QSlider(self.centralwidget)
+        self.verticalSlider_1.setObjectName(u"verticalSlider_1")
+        self.verticalSlider_1.setGeometry(QRect(190, 10, 16, 160))
+        self.verticalSlider_1.setMaximum(255)
+        self.verticalSlider_1.setOrientation(Qt.Vertical)
+        self.verticalSlider_2 = QSlider(self.centralwidget)
+        self.verticalSlider_2.setObjectName(u"verticalSlider_2")
+        self.verticalSlider_2.setGeometry(QRect(370, 10, 16, 160))
+        self.verticalSlider_2.setMaximum(255)
+        self.verticalSlider_2.setOrientation(Qt.Vertical)
+        self.horizontalSlider_1 = QSlider(self.centralwidget)
+        self.horizontalSlider_1.setObjectName(u"horizontalSlider_1")
+        self.horizontalSlider_1.setGeometry(QRect(700, 50, 451, 16))
+        self.horizontalSlider_1.setOrientation(Qt.Horizontal)
+        self.horizontalSlider_2 = QSlider(self.centralwidget)
+        self.horizontalSlider_2.setObjectName(u"horizontalSlider_2")
+        self.horizontalSlider_2.setGeometry(QRect(700, 100, 451, 16))
+        self.horizontalSlider_2.setOrientation(Qt.Horizontal)
+        self.lcdNumber_1 = QLCDNumber(self.centralwidget)
+        self.lcdNumber_1.setObjectName(u"lcdNumber_1")
+        self.lcdNumber_1.setGeometry(QRect(650, 40, 41, 31))
+        font = QFont()
+        font.setPointSize(10)
+        font.setBold(True)
+        font.setWeight(75)
+        self.lcdNumber_1.setFont(font)
+        self.lcdNumber_1.setDigitCount(2)
+        self.label = QLabel(self.centralwidget)
+        self.label.setObjectName(u"label")
+        self.label.setGeometry(QRect(320, 190, 701, 31))
+        self.lineEdit = QLineEdit(self.centralwidget)
+        self.lineEdit.setObjectName(u"lineEdit")
+        self.lineEdit.setGeometry(QRect(180, 190, 113, 23))
+        self.horizontalSlider_3 = QSlider(self.centralwidget)
+        self.horizontalSlider_3.setObjectName(u"horizontalSlider_3")
+        self.horizontalSlider_3.setGeometry(QRect(700, 150, 451, 16))
+        self.horizontalSlider_3.setOrientation(Qt.Horizontal)
+        self.lcdNumber_2 = QLCDNumber(self.centralwidget)
+        self.lcdNumber_2.setObjectName(u"lcdNumber_2")
+        self.lcdNumber_2.setGeometry(QRect(650, 90, 41, 31))
+        self.lcdNumber_2.setFont(font)
+        self.lcdNumber_2.setDigitCount(2)
+        self.lcdNumber_3 = QLCDNumber(self.centralwidget)
+        self.lcdNumber_3.setObjectName(u"lcdNumber_3")
+        self.lcdNumber_3.setGeometry(QRect(650, 140, 41, 31))
+        self.lcdNumber_3.setFont(font)
+        self.lcdNumber_3.setDigitCount(2)
+        self.lcdNumber_6 = QLCDNumber(self.centralwidget)
+        self.lcdNumber_6.setObjectName(u"lcdNumber_6")
+        self.lcdNumber_6.setGeometry(QRect(240, 30, 81, 51))
+        self.lcdNumber_6.setFont(font)
+        self.lcdNumber_6.setLineWidth(2)
+        self.lcdNumber_6.setDigitCount(3)
+        self.lcdNumber_7 = QLCDNumber(self.centralwidget)
+        self.lcdNumber_7.setObjectName(u"lcdNumber_7")
+        self.lcdNumber_7.setGeometry(QRect(240, 90, 81, 51))
+        self.lcdNumber_7.setFont(font)
+        self.lcdNumber_7.setLineWidth(2)
+        self.lcdNumber_7.setDigitCount(3)
+        self.lcdNumber_8 = QLCDNumber(self.centralwidget)
+        self.lcdNumber_8.setObjectName(u"lcdNumber_8")
+        self.lcdNumber_8.setGeometry(QRect(40, 160, 111, 51))
+        self.lcdNumber_8.setFont(font)
+        self.lcdNumber_8.setLineWidth(3)
+        self.lcdNumber_9 = QLCDNumber(self.centralwidget)
+        self.lcdNumber_9.setObjectName(u"lcdNumber_9")
+        self.lcdNumber_9.setGeometry(QRect(430, 50, 81, 51))
+        self.lcdNumber_9.setFont(font)
+        self.lcdNumber_9.setLineWidth(2)
+        self.lcdNumber_9.setDigitCount(3)
+        self.lcdNumber_10 = QLCDNumber(self.centralwidget)
+        self.lcdNumber_10.setObjectName(u"lcdNumber_10")
+        self.lcdNumber_10.setGeometry(QRect(530, 50, 81, 51))
+        self.lcdNumber_10.setFont(font)
+        self.lcdNumber_10.setLineWidth(2)
+        self.lcdNumber_10.setDigitCount(3)
+        MainWindow.setCentralWidget(self.centralwidget)
+        self.menubar = QMenuBar(MainWindow)
+        self.menubar.setObjectName(u"menubar")
+        self.menubar.setGeometry(QRect(0, 0, 1200, 26))
+        self.menuMenu_1 = QMenu(self.menubar)
+        self.menuMenu_1.setObjectName(u"menuMenu_1")
+        self.menuMenu_2 = QMenu(self.menubar)
+        self.menuMenu_2.setObjectName(u"menuMenu_2")
+        MainWindow.setMenuBar(self.menubar)
+        self.statusbar = QStatusBar(MainWindow)
+        self.statusbar.setObjectName(u"statusbar")
+        MainWindow.setStatusBar(self.statusbar)
+
+        self.menubar.addAction(self.menuMenu_1.menuAction())
+        self.menubar.addAction(self.menuMenu_2.menuAction())
+
+        self.retranslateUi(MainWindow)
+
+        QMetaObject.connectSlotsByName(MainWindow)
+    # setupUi
+
+    def retranslateUi(self, MainWindow):
+        MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"GE3", None))
+        self.actionMenu_2.setText(QCoreApplication.translate("MainWindow", u"Submenu_2", None))
+        self.pushButton_1.setText(QCoreApplication.translate("MainWindow", u"PushButton", None))
+        self.pushButton_2.setText(QCoreApplication.translate("MainWindow", u"PushButton", None))
+        self.label.setText(QCoreApplication.translate("MainWindow", u"TextLabel", None))
+        self.menuMenu_1.setTitle(QCoreApplication.translate("MainWindow", u"Menu_1", None))
+        self.menuMenu_2.setTitle(QCoreApplication.translate("MainWindow", u"Menu_2", None))
+    # retranslateUi
+

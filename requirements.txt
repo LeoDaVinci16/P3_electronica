@@ -1,0 +1,11 @@
+colorama @ file:///C:/ci_311/colorama_1676422310965/work
+mkl-service==2.5.2
+mkl_fft @ file:///C:/miniconda3/conda-bld/mkl_fft_1761592920106/work
+mkl_random @ file:///C:/miniconda3/conda-bld/mkl_random_1761593150425/work
+numpy @ file:///C:/Users/task_177520875146714/croot/numpy_and_numpy_base_1775209354609/work/dist/numpy-2.4.4-cp311-cp311-win_amd64.whl#sha256=2a2d8d71f07e895cd91230e808e408b72bda40d1b67bcd65cd64ddc72d7db17b
+packaging==26.0
+PyQt5==5.15.11
+PyQt5_sip @ file:///C:/miniconda3/conda-bld/pyqt-split_1764009083708/work/pyqt_sip
+pyqtgraph @ file:///C:/Users/task_177118270526451/croot/pyqtgraph_1771182857950/work
+pyserial @ file:///C:/b/abs_38q410cihh/croot/pyserial_1736540571753/work
+sip @ file:///C:/b/abs_f6ow8vlbb7/croot/sip_1756224172742/work

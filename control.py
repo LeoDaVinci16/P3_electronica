@@ -32,7 +32,7 @@ import serial, time, random, sys
 USE_SERIAL = False
 
 # Aqui comienzan los métodos del UI
-from control_v1 import *  # importo todo lo declarado en la UI
+from ui_v2 import *  # importo todo lo declarado en la UI
 from PyQt5.QtCore import QTimer # importo temporizador
 
 
@@ -41,43 +41,48 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi vent
         QtWidgets.QMainWindow.__init__(self, *args, **kwargs)
         self.setupUi(self) 
           
-        # inicio el temporizador o evento temporal y cargo la función a ejecutar MUESTREO
-        self.timer=QTimer()
-        self.timer.timeout.connect(self.muestreo)
-        self.timer.start(1000)   # en ms
-        self.timer.setInterval(100)
+        # Variables del sistema energètic (consolidated)
 
-        
-        # Editar los valores iniciales de las etiquetas que hay en la UI
-        #MainWindow.setObjectName("GEEE: Práctica gestión")
-        #_translate = QtCore.QCoreApplication.translate
-        #MainWindow.setWindowTitle(_translate("MainWindow", "GEEE: Práctica gestión"))
-        self.label.setText("Práctica 3: control")     
-        self.pushButton_1.setText("Lee serie")
-        self.pushButton_2.setText("PWM1:off")   
-        #self.lcdNumber_1.setObjectName("lcdNumber_1")            
-        
-        # Crear las conexiones de los eventos botones con las funcionalidades
-        self.pushButton_1.clicked.connect(self.botonSerie)   
-        self.pushButton_2.clicked.connect(self.botonON)
-        
-        # Se conecta el evento SLIDER con la acción leeLEDa donde estará LCD
-        self.horizontalSlider_1.valueChanged.connect(self.leeLEDa)
-        self.horizontalSlider_2.valueChanged.connect(self.leeLEDb)
-        self.horizontalSlider_3.valueChanged.connect(self.leeLEDc)
-        
-        self.verticalSlider_1.valueChanged.connect(self.leeLEDx)
-        self.verticalSlider_2.valueChanged.connect(self.leeLEDy)
-
-        #self.grafica = Canvas_grafica()
-        #self.ui.grafica.addWidget(self.grafica)
-        
         self.solar = 0
         self.diesel = 0
 
         self.red = 0
         self.blue = 0
         self.green = 0
+
+        # Graph data
+        self.dataN = []
+        self.dataY = []
+        self.lastN = 0
+
+        # inicio el temporizador o evento temporal y cargo la función a ejecutar MUESTREO
+        self.timer=QTimer()
+        self.timer.timeout.connect(self.muestreo)
+        self.timer.start(100)   # 100ms interval
+        
+        # Editar los valores iniciales de las etiquetas que hay en la UI
+        self.label.setText("Gestió Energètica: Balanç (Gen - Consum)")     
+        self.pushButton_1.setText("Boto Extra")
+        self.pushButton_2.setText("Generador: OFF")   
+        self.generador_activat = False
+        
+        # Crear las conexiones de los eventos botones con las funcionalidades
+        self.pushButton_1.clicked.connect(self.botonSerie)   
+        self.pushButton_2.clicked.connect(self.botonON)
+        
+        # Connexions dels sliders de CONSUM (Càrregues) als respectius LCDs i funcions
+        self.horizontalSlider_1.valueChanged.connect(self.leeCarga1)
+        self.horizontalSlider_2.valueChanged.connect(self.leeCarga2)
+        self.horizontalSlider_3.valueChanged.connect(self.leeCarga3)
+
+        # Connexions dels sliders de GENERACIÓ als respectius LCDs i funcions
+        self.verticalSlider_1.valueChanged.connect(self.leePV)
+        self.verticalSlider_2.valueChanged.connect(self.leeDiesel)
+
+        #self.grafica = Canvas_grafica()
+        #self.ui.grafica.addWidget(self.grafica)
+        
+
            
     # Crear nuevas funcionalidades 
     """ def muestreo(self):   # Mide periodicamente la tension
@@ -126,7 +131,37 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi vent
 
         else:
             # SIMULATION (fake sensor)
-            valor = self.solar * random.random() 
+            # 1. Calculem el consum total
+            consum_total = self.carga_1 + self.carga_2 + self.carga_3
+            
+            # 2. Generació actual pre-càlcul
+            generacio_diesel_actual = self.energia_diesel if self.generador_activat else 0
+            generacio_total = self.energia_pv + generacio_diesel_actual
+            
+            # 3. RESTRICCIÓ: La Càrrega 1 sempre ha d'estar coberta
+            if generacio_total < self.carga_1:
+                # Calculem l'energia que falta
+                falta = self.carga_1 - generacio_total
+                
+                # Si el generador està apagat, l'encenem automàticament
+                if not self.generador_activat:
+                    self.generador_activat = True
+                    self.pushButton_2.setText("Generador: ON")
+                    
+                # Calculem el nou valor on ha d'estar el slider del generador
+                nou_valor_diesel = self.energia_diesel + falta
+                
+                # Movem el slider de la interfície AUTOMÀTICAMENT
+                # Això dispararà la funció 'leeDiesel' per si sol i ens actualitzarà els LCDs
+                self.verticalSlider_2.setValue(nou_valor_diesel)
+                
+                # Com que hem canviat el dièsel en aquest mateix cicle, actualitzem la generació
+                generacio_total = self.energia_pv + self.energia_diesel
+            
+            # 4. El balanç net (Generació - Consum) totalment net, sense soroll
+            balanc_net = generacio_total - consum_total
+            
+            self.lcdNumber_8.display(balanc_net)   # Mostrem el balanç al LCD gran
 
         self.lcdNumber_8.display(valor)
 
@@ -140,7 +175,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi vent
 
         curva.setData(dataN, dataY)
                                
-    def leeLEDa(self,event):
+    def leeCarga1(self,event):
         self.lcdNumber_1.display(event)   # se pasa EVENT del SLIDER al LCD
         if USE_SERIAL and ser:
             ser.write(bytes('A'+str(event)+'\r','ascii'))
@@ -148,7 +183,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi vent
             print("Red", event)
             self.red = event
             self.update_consum()
-    def leeLEDb(self,event):
+    def leeCarga2(self,event):
         self.lcdNumber_2.display(event)   # se pasa EVENT del SLIDER al LCD
         if USE_SERIAL and ser:
             ser.write(bytes('A'+str(event)+'\r','ascii'))
@@ -156,7 +191,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi vent
             print("Blue", event)
             self.blue = event
             self.update_consum()
-    def leeLEDc(self,event):
+    def leeCarga3(self,event):
         self.lcdNumber_3.display(event)   # se pasa EVENT del SLIDER al LCD
         if USE_SERIAL and ser:
             ser.write(bytes('A'+str(event)+'\r','ascii'))
@@ -165,7 +200,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi vent
             self.green = event
             self.update_consum()
 
-    def leeLEDx(self,event):
+    def leePV(self,event):
         self.lcdNumber_6.display(event)   # se pasa EVENT del SLIDER al LCD
         #print(event)   # Muestra el dato EVENT en la pantalla de la consola 
         if USE_SERIAL and ser:
@@ -174,7 +209,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi vent
             print("Solar", event)
             self.solar = event
             self.update_power()
-    def leeLEDy(self,event):
+    def leeDiesel(self,event):
         self.lcdNumber_7.display(event)     # se pasa EVENT del SLIDER al LCD
         #print(event)   # Muestra el dato EVENT en la pantalla de la consola 
         if USE_SERIAL and ser:
@@ -197,11 +232,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi vent
     def botonON(self):       
         global estado 
         if (estado == False):
-            self.pushButton_2.setText("PWM1:on") 
+            self.pushButton_2.setText("Generador:on") 
             ser.write(b'on\r')
             estado = True
         else:
-            self.pushButton_2.setText("PWM1:off") 
+            self.pushButton_2.setText("Generador:off") 
             ser.write(b'off\r')
             estado = False
         #print(estado)           
@@ -209,7 +244,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi vent
     def botonSerie(self):       
         #ser.write(b'XXXX\r')
         #ser.write(b'V\r')
-        print('.')
+        print('Botó per defecte premut.')
   
         
         
@@ -241,7 +276,6 @@ lastN = 0
 num =0
 nuevoDato = 0 
 
-print("Hola arnau")
 
 win.show()
 
@@ -263,6 +297,7 @@ ser.write(b'off\r')
 time.sleep(0.2)
 ser.write(b'A0\r')
 time.sleep(0.2)
+
 # No sabes la cantidad de bytes recibidos, utilizo tabulador CR y/o LF.
 respuesta = ser.readline() 
 texto = respuesta.decode('utf-8')     # Transforma los bytes en string
