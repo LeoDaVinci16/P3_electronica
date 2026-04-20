@@ -88,7 +88,6 @@
       <font>
        <family>Arial</family>
        <pointsize>10</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -112,7 +111,6 @@
       <font>
        <family>Arial</family>
        <pointsize>10</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -136,7 +134,7 @@
       <number>255</number>
      </property>
      <property name="orientation">
-      <enum>Qt::Vertical</enum>
+      <enum>Qt::Orientation::Vertical</enum>
      </property>
     </widget>
     <widget class="QLCDNumber" name="lcdNumber_6">
@@ -152,7 +150,6 @@
       <font>
        <family>Arial</family>
        <pointsize>10</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -176,12 +173,11 @@
       <font>
        <family>Arial</family>
        <pointsize>10</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
      <property name="contextMenuPolicy">
-      <enum>Qt::NoContextMenu</enum>
+      <enum>Qt::ContextMenuPolicy::NoContextMenu</enum>
      </property>
      <property name="text">
       <string>Solar:</string>
@@ -206,7 +202,7 @@
       <number>255</number>
      </property>
      <property name="orientation">
-      <enum>Qt::Vertical</enum>
+      <enum>Qt::Orientation::Vertical</enum>
      </property>
     </widget>
     <widget class="QLCDNumber" name="lcdNumber_9">
@@ -222,7 +218,6 @@
       <font>
        <family>Arial</family>
        <pointsize>10</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -246,7 +241,6 @@
       <font>
        <family>Arial</family>
        <pointsize>10</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -305,12 +299,11 @@
       <font>
        <family>Arial</family>
        <pointsize>20</pointsize>
-       <weight>50</weight>
        <bold>false</bold>
       </font>
      </property>
      <property name="contextMenuPolicy">
-      <enum>Qt::NoContextMenu</enum>
+      <enum>Qt::ContextMenuPolicy::NoContextMenu</enum>
      </property>
      <property name="text">
       <string>kW</string>
@@ -329,12 +322,11 @@
       <font>
        <family>Arial</family>
        <pointsize>20</pointsize>
-       <weight>50</weight>
        <bold>false</bold>
       </font>
      </property>
      <property name="contextMenuPolicy">
-      <enum>Qt::NoContextMenu</enum>
+      <enum>Qt::ContextMenuPolicy::NoContextMenu</enum>
      </property>
      <property name="text">
       <string>kW</string>
@@ -353,12 +345,11 @@
       <font>
        <family>Arial</family>
        <pointsize>20</pointsize>
-       <weight>50</weight>
        <bold>false</bold>
       </font>
      </property>
      <property name="contextMenuPolicy">
-      <enum>Qt::NoContextMenu</enum>
+      <enum>Qt::ContextMenuPolicy::NoContextMenu</enum>
      </property>
      <property name="text">
       <string>kW</string>
@@ -454,7 +445,6 @@
       <font>
        <family>Arial</family>
        <pointsize>10</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -478,7 +468,6 @@
       <font>
        <family>Arial</family>
        <pointsize>10</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -502,7 +491,7 @@
       <string notr="true">border-color: rgb(0, 255, 0);</string>
      </property>
      <property name="orientation">
-      <enum>Qt::Horizontal</enum>
+      <enum>Qt::Orientation::Horizontal</enum>
      </property>
     </widget>
     <widget class="QLCDNumber" name="lcdNumber_3">
@@ -555,7 +544,6 @@
       <font>
        <family>Arial</family>
        <pointsize>10</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -1045,7 +1033,6 @@
       <font>
        <family>Arial</family>
        <pointsize>10</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -1106,7 +1093,6 @@
       <font>
        <family>Arial</family>
        <pointsize>10</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -1157,7 +1143,7 @@
       <string notr="true">selection-color: rgb(255, 0, 0);</string>
      </property>
      <property name="orientation">
-      <enum>Qt::Horizontal</enum>
+      <enum>Qt::Orientation::Horizontal</enum>
      </property>
     </widget>
     <widget class="QSlider" name="horizontalSlider_2">
@@ -1183,7 +1169,7 @@
 </string>
      </property>
      <property name="orientation">
-      <enum>Qt::Horizontal</enum>
+      <enum>Qt::Orientation::Horizontal</enum>
      </property>
     </widget>
     <widget class="QPushButton" name="pushButton">
@@ -1285,12 +1271,11 @@ color: rgb(255, 255, 255)</string>
       <font>
        <family>Arial</family>
        <pointsize>20</pointsize>
-       <weight>50</weight>
        <bold>false</bold>
       </font>
      </property>
      <property name="contextMenuPolicy">
-      <enum>Qt::NoContextMenu</enum>
+      <enum>Qt::ContextMenuPolicy::NoContextMenu</enum>
      </property>
      <property name="text">
       <string>kW</string>
@@ -1322,7 +1307,6 @@ color: rgb(255, 255, 255)</string>
       <font>
        <family>Arial</family>
        <pointsize>10</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -1343,12 +1327,11 @@ color: rgb(255, 255, 255)</string>
       <font>
        <family>Arial</family>
        <pointsize>10</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
      <property name="contextMenuPolicy">
-      <enum>Qt::NoContextMenu</enum>
+      <enum>Qt::ContextMenuPolicy::NoContextMenu</enum>
      </property>
      <property name="text">
       <string>Condensador</string>
@@ -1406,7 +1389,6 @@ color: rgb(255, 255, 255)</string>
       <font>
        <family>Arial</family>
        <pointsize>10</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
@@ -1427,12 +1409,11 @@ color: rgb(255, 255, 255)</string>
       <font>
        <family>Arial</family>
        <pointsize>10</pointsize>
-       <weight>75</weight>
        <bold>true</bold>
       </font>
      </property>
      <property name="contextMenuPolicy">
-      <enum>Qt::NoContextMenu</enum>
+      <enum>Qt::ContextMenuPolicy::NoContextMenu</enum>
      </property>
      <property name="text">
       <string>SoC:</string>
@@ -1451,12 +1432,11 @@ color: rgb(255, 255, 255)</string>
       <font>
        <family>Arial</family>
        <pointsize>26</pointsize>
-       <weight>50</weight>
        <bold>false</bold>
       </font>
      </property>
      <property name="contextMenuPolicy">
-      <enum>Qt::NoContextMenu</enum>
+      <enum>Qt::ContextMenuPolicy::NoContextMenu</enum>
      </property>
      <property name="text">
       <string>%</string>
@@ -1475,21 +1455,34 @@ color: rgb(255, 255, 255)</string>
       <font>
        <family>Arial</family>
        <pointsize>20</pointsize>
-       <weight>50</weight>
        <bold>false</bold>
       </font>
      </property>
      <property name="contextMenuPolicy">
-      <enum>Qt::NoContextMenu</enum>
+      <enum>Qt::ContextMenuPolicy::NoContextMenu</enum>
      </property>
      <property name="text">
       <string>kW</string>
      </property>
     </widget>
    </widget>
+   <widget class="QPushButton" name="pushButton_3">
+    <property name="geometry">
+     <rect>
+      <x>1010</x>
+      <y>500</y>
+      <width>79</width>
+      <height>24</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Turn OFF</string>
+    </property>
+   </widget>
    <zorder>groupBox_2</zorder>
    <zorder>groupBox</zorder>
    <zorder>groupBox_3</zorder>
+   <zorder>pushButton_3</zorder>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
@@ -1497,7 +1490,7 @@ color: rgb(255, 255, 255)</string>
      <x>0</x>
      <y>0</y>
      <width>1122</width>
-     <height>25</height>
+     <height>33</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuMenu_1">

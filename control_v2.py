@@ -1,174 +1,210 @@
 # -*- coding: utf-8 -*-
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 import pyqtgraph as pg
 from PyQt5.QtCore import QTimer
 from ui_v2 import *
 
 
 # -------------------------------
-# MODEL (no Qt here)
+# MODEL
 # -------------------------------
 class EnergySystem:
     def __init__(self):
-        self.carga = [0, 0, 0]
+        self.carga = [0, 0, 0]          # requested loads
+        self.carga_on = [True, True, True]  # actual delivered loads
+
         self.pv = 0
+        self.pv_on = True
+
         self.diesel = 0
-        self.generador_on = False
-
-    def total_load(self):
-        return sum(self.carga)
-
-    def total_generation(self):
-        return self.pv + (self.diesel if self.generador_on else 0)
+        self.diesel_base = 0
+        self.generador_on = True
 
 
 # -------------------------------
-# UI (your existing class)
+# CONTROLLER
 # -------------------------------
 class DieselController:
     def update(self, system: EnergySystem):
-        if system.total_generation() < system.carga[0]:
-            deficit = system.carga[0] - system.total_generation()
-            system.generador_on = True
-            system.diesel += deficit
+
+        pv = system.pv if system.pv_on else 0
+
+        red_demand = system.carga[0]
+
+        # ----------------------------
+        # CRITICAL LOGIC (RED ONLY)
+        # ----------------------------
+
+        if pv >= red_demand:
+            # PV alone is enough → no diesel needed
+            system.carga_on[0] = True
+            system.diesel = 0
+
+        else:
+            # PV not enough → diesel covers the gap
+            missing = red_demand - pv
+            system.diesel = missing
+            system.carga_on[0] = True
+
+        # ----------------------------
+        # NON-CRITICAL LOADS (BLUE/GREEN)
+        # only use surplus energy
+        # ----------------------------
+
+        available = max(0, pv + system.diesel - red_demand)
+
+        # BLUE (index 1)
+        if available >= system.carga[1]:
+            system.carga_on[1] = True
+            available -= system.carga[1]
+        else:
+            system.carga_on[1] = False
+
+        # GREEN (index 2)
+        if available >= system.carga[2]:
+            system.carga_on[2] = True
+            available -= system.carga[2]
+        else:
+            system.carga_on[2] = False
 
 
-
-class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): 
-    def __init__(self, *args, **kwargs):
-        QtWidgets.QMainWindow.__init__(self, *args, **kwargs)
+# -------------------------------
+# MAIN WINDOW
+# -------------------------------
+class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
+    def __init__(self):
+        super().__init__()
 
         self.system = EnergySystem()
-        self.controller = DieselController()   
+        self.controller = DieselController()
 
+        self.setupUi(self)
 
-
-
-        self.setupUi(self) 
-
-        # inicio el temporizador o evento temporal y cargo la función a ejecutar MUESTREO
+        # ---------------- TIMER ----------------
         self.timer = QTimer()
-        self.timer.timeout.connect(self.muestreo)
-        self.timer.start(100)   # Actualització de la gràfica cada 100ms
+        self.timer.timeout.connect(self.updateSystem)
+        self.timer.start(100)
 
-        # Editar los valores iniciales de las etiquetas que hay en la UI
-        self.label.setText("Solar: ")     
-        self.pushButton_1.setText("Solar ON")
-        self.pushButton_2.setText("Generador: OFF")   
-        self.generador_activat = False
-        
-        # Crear las conexiones de los eventos botones
-        self.pushButton_1.clicked.connect(self.botonSerie)   
-        self.pushButton_2.clicked.connect(self.botonON)
-        
-        # Connexions dels sliders de CONSUM (Càrregues) als respectius LCDs i funcions
-        self.horizontalSlider_1.valueChanged.connect(self.leeCarga1)
-        self.horizontalSlider_2.valueChanged.connect(self.leeCarga2)
-        self.horizontalSlider_3.valueChanged.connect(self.leeCarga3)
-        
-        # Connexions dels sliders de GENERACIÓ als respectius LCDs i funcions
-        self.verticalSlider_1.valueChanged.connect(self.leePV)
-        self.verticalSlider_2.valueChanged.connect(self.leeDiesel)
+        # ---------------- BUTTONS ----------------
+        self.pushButton_1.clicked.connect(self.toggleSolar)
+        self.pushButton_2.clicked.connect(self.toggleDiesel)
+        self.pushButton_3.clicked.connect(self.closeAll)
 
+        # ---------------- SLIDERS ----------------
+        self.horizontalSlider_1.valueChanged.connect(lambda v: self.setCarga(0, v))
+        self.horizontalSlider_2.valueChanged.connect(lambda v: self.setCarga(1, v))
+        self.horizontalSlider_3.valueChanged.connect(lambda v: self.setCarga(2, v))
 
+        self.verticalSlider_1.valueChanged.connect(self.setPV)
+        self.verticalSlider_2.valueChanged.connect(self.setDiesel)
 
-    # --- FUNCIÓ DE MOSTREIG (BALANÇ I CONTROL AUTOMÀTIC DIÈSEL) ---
+    # ---------------- SYSTEM LOOP ----------------
+    def updateSystem(self):
 
+        global curva, dataN, dataY, lastN, win
 
-    def muestreo(self):   
-        global curva, dataN, dataY, lastN
-
-        #controler
         self.controller.update(self.system)
 
-        #compute values
-        generacion = self.system.total_generation()
-        consumo = self.system.total_load()
-        balance = generacion - consumo
-        
-        # update UI
+        gen = (self.system.pv if self.system.pv_on else 0) + self.system.diesel
+        load = sum(
+            self.system.carga[i] if self.system.carga_on[i] else 0
+            for i in range(3)
+        )
+        balance = gen - load
+
+        # ---------------- LCDS ----------------
         self.lcdNumber_8.display(balance)
+        self.lcdNumber_7.display(self.system.diesel)
+        self.lcdNumber_9.display(gen)
+        self.lcdNumber_10.display(load)
 
-        if self.system.generador_on:
-            self.pushButton_2.setText("Generador: ON")
-        else:
-            self.pushButton_2.setText("Generador: OFF")
+        # ---------------- UPDATE LOAD DISPLAY (REAL OUTPUT) ----------------
+        self.refreshLoads()
 
-        def botonON(self):
-            self.system.generador_on = not self.system.generador_on
+        # ---------------- BUTTON TEXT ----------------
+        self.pushButton_1.setText("Solar ON" if self.system.pv_on else "Solar OFF")
+        self.pushButton_2.setText("Diesel ON" if self.system.generador_on else "Diesel OFF")
 
-        
-        self.lcdNumber_8.display(balance)   # Mostrem el balanç al LCD gran
-        
-        # Agregamos los datos al array
+        # ---------------- GRAPH ----------------
         dataY.append(balance)
         dataN.append(lastN)
         lastN += 1
 
-        # Limitamos a mostrar solo 200 muestras per veure bé els canvis
         if len(dataN) > 200:
-            dataY = dataY[1:-1]
-            dataN = dataN[1:-1]
+            dataN = dataN[-200:]
+            dataY = dataY[-200:]
 
-        # Actualizamos los datos y refrescamos la gráfica
-        curva.setData(dataN, dataY)     
-        QtWidgets.QApplication.processEvents()   
-        # --- FUNCIONS DELS SLIDERS ---
-    def leeCarga1(self, value):
-        self.lcdNumber_1.display(value)
-        self.system.carga[0] = value
+        curva.setData(dataN, dataY)
 
-    def leeCarga2(self, value):
-        self.lcdNumber_2.display(value)
-        self.system.carga[1] = value
+    # ---------------- LOAD DISPLAY ----------------
+    def refreshLoads(self):
+        self.lcdNumber_1.display(self.system.carga[0] if self.system.carga_on[0] else 0)
+        self.lcdNumber_2.display(self.system.carga[1] if self.system.carga_on[1] else 0)
+        self.lcdNumber_3.display(self.system.carga[2] if self.system.carga_on[2] else 0)
 
-    def leeCarga3(self, value):
-        self.lcdNumber_3.display(value)
-        self.system.carga[2] = value
+    # ---------------- INPUTS ----------------
+    def setCarga(self, i, value):
+        self.system.carga[i] = value
+        if value > 0:
+            self.system.carga_on[i] = True
 
-    def leePV(self, value):
-        self.lcdNumber_6.display(value)
-        self.system.pv = value
-
-    def leeDiesel(self, value):
-        self.lcdNumber_7.display(value)
-        self.system.diesel = value         
-                          
-    def botonON(self):       
-        if not self.generador_activat:
-            self.pushButton_2.setText("Generador: ON") 
-            self.generador_activat = True
+    def setPV(self, value):
+        if self.system.pv_on:
+            self.system.pv = value
         else:
-            self.pushButton_2.setText("Generador: OFF") 
-            self.generador_activat = False
-        
-    def botonSerie(self):       
-        print('Botó per defecte premut.')
+            self.system.pv = 0
+        self.lcdNumber_6.display(self.system.pv)
 
-# Pantalla auxiliar per la gràfica
+    def setDiesel(self, value):
+        self.system.diesel_base = value
+        self.lcdNumber_7.display(value)
+
+    # ---------------- BUTTONS ----------------
+    def toggleSolar(self):
+        self.system.pv_on = not self.system.pv_on
+        if not self.system.pv_on:
+            self.system.pv = 0
+        self.lcdNumber_6.display(self.system.pv)
+
+    def toggleDiesel(self):
+        self.system.generador_on = not self.system.generador_on
+        if not self.system.generador_on:
+            self.system.diesel = 0
+
+    # ---------------- CLOSE ALL ----------------
+    def closeAll(self):
+        global win
+        try:
+            win.close()
+        except:
+            pass
+        self.close()
+
+
+# -------------------------------
+# GRAPH
+# -------------------------------
 app = QtWidgets.QApplication.instance()
 if app is None:
     app = QtWidgets.QApplication([])
 
-# --- NOU CODI: Utilitzem GraphicsLayoutWidget ---
-win = pg.GraphicsLayoutWidget(title="Balanç Energètic del Sistema")     
-win.show() # Ara cal indicar explícitament que la mostri
-p = win.addPlot(title="Balanç Net (Generació - Consum)")                
-# ------------------------------------------------
-curva = p.plot(pen='y')
-p.enableAutoRange(axis='y') # Ajustament automàtic a la gràfica Y
+win = pg.GraphicsLayoutWidget(title="Balanç Energètic")
+win.show()
 
-dataN = [] 
-dataY = []  
+p = win.addPlot(title="Balance")
+curva = p.plot(pen='y')
+p.enableAutoRange(axis='y')
+
+dataN = []
+dataY = []
 lastN = 0
 
-# Aqui se abre la UI
-if __name__ == "__main__":  
-    app = QtWidgets.QApplication.instance()
-    if app is None:
-        app = QtWidgets.QApplication([])
+
+# -------------------------------
+# MAIN
+# -------------------------------
+if __name__ == "__main__":
     window = MainWindow()
     window.show()
     app.exec_()
-
