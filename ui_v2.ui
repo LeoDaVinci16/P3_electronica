@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1122</width>
-    <height>696</height>
+    <height>607</height>
    </rect>
   </property>
   <property name="palette">
@@ -63,53 +63,6 @@
    <bool>true</bool>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QPushButton" name="pushButton_1">
-    <property name="geometry">
-     <rect>
-      <x>820</x>
-      <y>470</y>
-      <width>80</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>PushButton</string>
-    </property>
-   </widget>
-   <widget class="QLCDNumber" name="lcdNumber_8">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>480</y>
-      <width>111</width>
-      <height>51</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <family>Arial</family>
-      <pointsize>10</pointsize>
-      <weight>75</weight>
-      <bold>true</bold>
-     </font>
-    </property>
-    <property name="lineWidth">
-     <number>3</number>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_3">
-    <property name="geometry">
-     <rect>
-      <x>130</x>
-      <y>480</y>
-      <width>91</width>
-      <height>51</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>condensador</string>
-    </property>
-   </widget>
    <widget class="QGroupBox" name="groupBox">
     <property name="geometry">
      <rect>
@@ -125,7 +78,7 @@
     <widget class="QLCDNumber" name="lcdNumber_7">
      <property name="geometry">
       <rect>
-       <x>220</x>
+       <x>210</x>
        <y>50</y>
        <width>81</width>
        <height>51</height>
@@ -164,13 +117,13 @@
       </font>
      </property>
      <property name="text">
-      <string>Diesel</string>
+      <string>Diesel:</string>
      </property>
     </widget>
     <widget class="QSlider" name="verticalSlider_2">
      <property name="geometry">
       <rect>
-       <x>180</x>
+       <x>190</x>
        <y>30</y>
        <width>20</width>
        <height>161</height>
@@ -189,7 +142,7 @@
     <widget class="QLCDNumber" name="lcdNumber_6">
      <property name="geometry">
       <rect>
-       <x>50</x>
+       <x>30</x>
        <y>50</y>
        <width>81</width>
        <height>51</height>
@@ -215,7 +168,7 @@
       <rect>
        <x>50</x>
        <y>20</y>
-       <width>41</width>
+       <width>171</width>
        <height>31</height>
       </rect>
      </property>
@@ -231,7 +184,7 @@
       <enum>Qt::NoContextMenu</enum>
      </property>
      <property name="text">
-      <string>Solar</string>
+      <string>Solar:</string>
      </property>
     </widget>
     <widget class="QSlider" name="verticalSlider_1">
@@ -259,8 +212,8 @@
     <widget class="QLCDNumber" name="lcdNumber_9">
      <property name="geometry">
       <rect>
-       <x>40</x>
-       <y>220</y>
+       <x>30</x>
+       <y>230</y>
        <width>81</width>
        <height>51</height>
       </rect>
@@ -283,8 +236,8 @@
     <widget class="QLabel" name="label_2">
      <property name="geometry">
       <rect>
-       <x>140</x>
-       <y>230</y>
+       <x>20</x>
+       <y>200</y>
        <width>191</width>
        <height>31</height>
       </rect>
@@ -301,13 +254,123 @@
       <string>POTÈNCIA DISPONIBLE</string>
      </property>
     </widget>
+    <widget class="QPushButton" name="pushButton_1">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>120</y>
+       <width>141</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Arial</family>
+       <pointsize>8</pointsize>
+      </font>
+     </property>
+     <property name="text">
+      <string>ON/OF</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButton_2">
+     <property name="geometry">
+      <rect>
+       <x>210</x>
+       <y>120</y>
+       <width>151</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Arial</family>
+       <pointsize>8</pointsize>
+      </font>
+     </property>
+     <property name="text">
+      <string>ON/OFF</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_10">
+     <property name="geometry">
+      <rect>
+       <x>120</x>
+       <y>50</y>
+       <width>121</width>
+       <height>51</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Arial</family>
+       <pointsize>20</pointsize>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="text">
+      <string>kW</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_11">
+     <property name="geometry">
+      <rect>
+       <x>300</x>
+       <y>50</y>
+       <width>121</width>
+       <height>51</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Arial</family>
+       <pointsize>20</pointsize>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="text">
+      <string>kW</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_13">
+     <property name="geometry">
+      <rect>
+       <x>120</x>
+       <y>230</y>
+       <width>121</width>
+       <height>51</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Arial</family>
+       <pointsize>20</pointsize>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="text">
+      <string>kW</string>
+     </property>
+    </widget>
    </widget>
    <widget class="QGroupBox" name="groupBox_2">
     <property name="geometry">
      <rect>
       <x>400</x>
       <y>20</y>
-      <width>681</width>
+      <width>691</width>
       <height>301</height>
      </rect>
     </property>
@@ -381,8 +444,8 @@
     <widget class="QLCDNumber" name="lcdNumber_10">
      <property name="geometry">
       <rect>
-       <x>90</x>
-       <y>210</y>
+       <x>250</x>
+       <y>230</y>
        <width>81</width>
        <height>51</height>
       </rect>
@@ -405,8 +468,8 @@
     <widget class="QLabel" name="label_9">
      <property name="geometry">
       <rect>
-       <x>210</x>
-       <y>220</y>
+       <x>40</x>
+       <y>250</y>
        <width>191</width>
        <height>31</height>
       </rect>
@@ -434,6 +497,9 @@
      </property>
      <property name="cursor">
       <cursorShape>SizeHorCursor</cursorShape>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">border-color: rgb(0, 255, 0);</string>
      </property>
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
@@ -1038,6 +1104,7 @@
      </property>
      <property name="font">
       <font>
+       <family>Arial</family>
        <pointsize>10</pointsize>
        <weight>75</weight>
        <bold>true</bold>
@@ -1068,7 +1135,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>CONSUM</string>
+      <string>CONSUM (kW):</string>
      </property>
     </widget>
     <widget class="QSlider" name="horizontalSlider_1">
@@ -1087,7 +1154,7 @@
       <cursorShape>SizeHorCursor</cursorShape>
      </property>
      <property name="styleSheet">
-      <string notr="true">background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(0, 0, 0, 255), stop:1 rgba(255, 255, 255, 255));</string>
+      <string notr="true">selection-color: rgb(255, 0, 0);</string>
      </property>
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
@@ -1109,76 +1176,320 @@
       <bool>true</bool>
      </property>
      <property name="autoFillBackground">
-      <bool>true</bool>
+      <bool>false</bool>
      </property>
      <property name="styleSheet">
-      <string notr="true">background-color: rgb(0, 255, 255);
-alternate-background-color: rgb(0, 170, 255);
-color: rgb(0, 0, 255);</string>
+      <string notr="true">alternate-background-color: rgb(0, 0, 255);
+</string>
      </property>
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
     </widget>
-    <widget class="QLabel" name="label_6">
+    <widget class="QPushButton" name="pushButton">
      <property name="geometry">
       <rect>
-       <x>560</x>
-       <y>50</y>
-       <width>141</width>
-       <height>31</height>
+       <x>520</x>
+       <y>200</y>
+       <width>151</width>
+       <height>28</height>
       </rect>
+     </property>
+     <property name="text">
+      <string>Apagar no crític</string>
+     </property>
+    </widget>
+    <widget class="QCheckBox" name="checkBox">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>550</x>
+       <y>60</y>
+       <width>131</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Arial</family>
+       <pointsize>10</pointsize>
+      </font>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">color: rgb(255, 255, 255);
+background-color: rgb(255, 0, 0);
+</string>
      </property>
      <property name="text">
       <string>Roig: Crític</string>
      </property>
     </widget>
-    <widget class="QLabel" name="label_7">
+    <widget class="QCheckBox" name="checkBox_2">
      <property name="geometry">
       <rect>
-       <x>560</x>
-       <y>100</y>
-       <width>141</width>
-       <height>31</height>
+       <x>550</x>
+       <y>160</y>
+       <width>131</width>
+       <height>20</height>
       </rect>
      </property>
-     <property name="text">
-      <string>Blau: No crític</string>
+     <property name="font">
+      <font>
+       <family>Arial</family>
+       <pointsize>10</pointsize>
+      </font>
      </property>
-    </widget>
-    <widget class="QLabel" name="label_8">
-     <property name="geometry">
-      <rect>
-       <x>560</x>
-       <y>150</y>
-       <width>141</width>
-       <height>31</height>
-      </rect>
+     <property name="styleSheet">
+      <string notr="true">background-color: rgb(0, 170, 0);
+color: rgb(255, 255, 255)</string>
      </property>
      <property name="text">
       <string>Verd: No crític</string>
      </property>
     </widget>
+    <widget class="QCheckBox" name="checkBox_3">
+     <property name="geometry">
+      <rect>
+       <x>550</x>
+       <y>110</y>
+       <width>131</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Arial</family>
+       <pointsize>10</pointsize>
+      </font>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">background-color: rgb(0, 0, 255);
+color: rgb(255, 255, 255)</string>
+     </property>
+     <property name="text">
+      <string>Blau: No crític</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_12">
+     <property name="geometry">
+      <rect>
+       <x>340</x>
+       <y>230</y>
+       <width>121</width>
+       <height>51</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Arial</family>
+       <pointsize>20</pointsize>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="text">
+      <string>kW</string>
+     </property>
+    </widget>
    </widget>
-   <widget class="QPushButton" name="pushButton_2">
+   <widget class="QGroupBox" name="groupBox_3">
     <property name="geometry">
      <rect>
-      <x>880</x>
-      <y>490</y>
-      <width>80</width>
-      <height>23</height>
+      <x>10</x>
+      <y>340</y>
+      <width>771</width>
+      <height>201</height>
      </rect>
     </property>
-    <property name="text">
-     <string>PushButton</string>
+    <property name="title">
+     <string>Emmagatzematge</string>
     </property>
+    <widget class="QLCDNumber" name="lcdNumber_8">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>70</y>
+       <width>111</width>
+       <height>51</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Arial</family>
+       <pointsize>10</pointsize>
+       <weight>75</weight>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="lineWidth">
+      <number>3</number>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_6">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>30</y>
+       <width>121</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Arial</family>
+       <pointsize>10</pointsize>
+       <weight>75</weight>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="text">
+      <string>Condensador</string>
+     </property>
+    </widget>
+    <widget class="QCheckBox" name="checkBox_4">
+     <property name="geometry">
+      <rect>
+       <x>210</x>
+       <y>50</y>
+       <width>181</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Mode de càrrega 1</string>
+     </property>
+    </widget>
+    <widget class="QCheckBox" name="checkBox_5">
+     <property name="geometry">
+      <rect>
+       <x>210</x>
+       <y>110</y>
+       <width>181</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Mode de càrrega 3</string>
+     </property>
+    </widget>
+    <widget class="QCheckBox" name="checkBox_6">
+     <property name="geometry">
+      <rect>
+       <x>210</x>
+       <y>80</y>
+       <width>181</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Mode de càrrega 2</string>
+     </property>
+    </widget>
+    <widget class="QLCDNumber" name="lcdNumber_11">
+     <property name="geometry">
+      <rect>
+       <x>480</x>
+       <y>70</y>
+       <width>111</width>
+       <height>51</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Arial</family>
+       <pointsize>10</pointsize>
+       <weight>75</weight>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="lineWidth">
+      <number>3</number>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_7">
+     <property name="geometry">
+      <rect>
+       <x>480</x>
+       <y>30</y>
+       <width>121</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Arial</family>
+       <pointsize>10</pointsize>
+       <weight>75</weight>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="text">
+      <string>SoC:</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_8">
+     <property name="geometry">
+      <rect>
+       <x>600</x>
+       <y>70</y>
+       <width>121</width>
+       <height>51</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Arial</family>
+       <pointsize>26</pointsize>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="text">
+      <string>%</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_14">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>70</y>
+       <width>121</width>
+       <height>51</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Arial</family>
+       <pointsize>20</pointsize>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="text">
+      <string>kW</string>
+     </property>
+    </widget>
    </widget>
    <zorder>groupBox_2</zorder>
    <zorder>groupBox</zorder>
-   <zorder>pushButton_1</zorder>
-   <zorder>lcdNumber_8</zorder>
-   <zorder>label_3</zorder>
-   <zorder>pushButton_2</zorder>
+   <zorder>groupBox_3</zorder>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
