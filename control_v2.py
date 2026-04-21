@@ -185,7 +185,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # time:
         self.simulation_time += self.dt
-        self.lcdNumber_time.display(self.simulation_time)
         self.label_time.setText(f"Time: {self.simulation_time:.1f} s")
 
     # =====================================================
@@ -201,7 +200,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def set_grid(self, value):
         self.state.grid_base = value
-        print(f"grid val: {value}")
+        print(f"La xarxa val: {value}")
 
     # solar toggle WITH SLIDER RESET
     def toggle_pv(self):

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'ui_v2.ui'
+# Form implementation generated from reading ui file 'ui_v3.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -751,14 +751,22 @@ class Ui_MainWindow(object):
         self.line_24.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.line_24.setObjectName("line_24")
         self.label_time = QtWidgets.QLabel(self.centralwidget)
-        self.label_time.setGeometry(QtCore.QRect(840, 890, 131, 31))
+        self.label_time.setGeometry(QtCore.QRect(630, 890, 341, 31))
+        font = QtGui.QFont()
+        font.setFamily("Arial")
+        font.setPointSize(20)
+        self.label_time.setFont(font)
         self.label_time.setObjectName("label_time")
+        self.label_date = QtWidgets.QLabel(self.centralwidget)
+        self.label_date.setGeometry(QtCore.QRect(70, 860, 441, 16))
+        self.label_date.setObjectName("label_date")
         self.groupBox_2.raise_()
         self.groupBox.raise_()
         self.groupBox_3.raise_()
         self.pushButton_3.raise_()
         self.groupBox_4.raise_()
         self.label_time.raise_()
+        self.label_date.raise_()
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 1122, 25))
@@ -825,6 +833,7 @@ class Ui_MainWindow(object):
         self.label_15.setText(_translate("MainWindow", "Solar"))
         self.checkBox_8.setText(_translate("MainWindow", "Blau: No crític"))
         self.label_time.setText(_translate("MainWindow", "TextLabel"))
+        self.label_date.setText(_translate("MainWindow", "TextLabel"))
         self.menuMenu_1.setTitle(_translate("MainWindow", "Menu_1"))
         self.menuPot_ncia.setTitle(_translate("MainWindow", "Potència"))
         self.menuMenu_2.setTitle(_translate("MainWindow", "Menu_2"))
