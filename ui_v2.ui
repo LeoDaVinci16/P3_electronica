@@ -117,7 +117,7 @@
       </font>
      </property>
      <property name="text">
-      <string>Diesel:</string>
+      <string>Xarxa:</string>
      </property>
     </widget>
     <widget class="QSlider" name="verticalSlider_2">
@@ -1560,7 +1560,7 @@ color: rgb(255, 255, 255)</string>
       </rect>
      </property>
      <property name="text">
-      <string>Diesel</string>
+      <string>Xarxa</string>
      </property>
     </widget>
     <widget class="Line" name="line_18">

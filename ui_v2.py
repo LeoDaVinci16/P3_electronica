@@ -812,7 +812,7 @@ class Ui_MainWindow(object):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "SCADA-P3"))
         self.groupBox.setTitle(_translate("MainWindow", "Potència d\'entrada"))
-        self.label_4.setText(_translate("MainWindow", "Diesel:"))
+        self.label_4.setText(_translate("MainWindow", "Xarxa:"))
         self.label.setText(_translate("MainWindow", "Solar:"))
         self.label_2.setText(_translate("MainWindow", "POTÈNCIA DISPONIBLE"))
         self.pushButton_1.setText(_translate("MainWindow", "ON/OF"))
@@ -838,7 +838,7 @@ class Ui_MainWindow(object):
         self.label_14.setText(_translate("MainWindow", "kW"))
         self.pushButton_3.setText(_translate("MainWindow", "EXIT"))
         self.groupBox_4.setTitle(_translate("MainWindow", "Esquema"))
-        self.label_16.setText(_translate("MainWindow", "Diesel"))
+        self.label_16.setText(_translate("MainWindow", "Xarxa"))
         self.checkBox_7.setText(_translate("MainWindow", "Roig: Crític"))
         self.checkBox_9.setText(_translate("MainWindow", "Verd: No crític"))
         self.label_17.setText(_translate("MainWindow", "Condensor"))

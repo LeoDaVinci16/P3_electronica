@@ -19,10 +19,10 @@ class EnergyState:
         self.pv = 0
         self.pv_on = True
 
-        self.diesel_base = 0
-        self.diesel = 0
+        self.grid_base = 0
+        self.grid = 0
 
-        self.storage = 0.0   # NEW
+        self.storage = 0.0
 
 
 # =========================================================
@@ -32,9 +32,9 @@ class EnergyController:
 
     def compute(self, s):
         pv = s.pv if s.pv_on else 0
-        diesel = s.diesel_base
+        grid = s.grid_base
 
-        gen = pv + diesel
+        gen = pv + grid
 
         load = s.load[:]  # [red, green, blue]
 
@@ -42,18 +42,9 @@ class EnergyController:
         remaining = gen
 
         # --------------------------------------------------
-        # STEP 1: NON-CRITICAL FIRST (green, blue)
-        # they can fail naturally
-        # --------------------------------------------------
-        for i in (1, 2):
-            if remaining >= load[i]:
-                served[i] = True
-                remaining -= load[i]
-
-        # --------------------------------------------------
-        # STEP 2: CRITICAL LOAD (red)
+        # STEP 1: CRITICAL LOAD (red)
         # must be served if possible
-        # diesel is adjusted ONLY here
+        # grid is adjusted ONLY here
         # --------------------------------------------------
         red = load[0]
 
@@ -63,43 +54,31 @@ class EnergyController:
         else:
             missing = red - remaining
 
-            # diesel compensates ONLY for critical
-            diesel += missing
+            # grid compensates ONLY for critical
+            grid += missing
             gen += missing
 
             served[0] = True
             remaining = 0
 
         # --------------------------------------------------
-        # STEP 3: STORAGE (infinite battery) (New)
+        # STEP 2: NON-CRITICAL FIRST (green, blue)
+        # they can fail naturally
         # --------------------------------------------------
+        for i in (1, 2):
+            if remaining >= load[i]:
+                served[i] = True
+                remaining -= load[i]
 
-        total_load = sum(load[i] if served[i] else 0 for i in range(3))
-
-        net = gen - total_load
-
-        # charge or discharge
-        if net >= 0:
-            s.storage += net
-            storage_discharge = 0
-        else:
-            needed = -net
-
-            discharge = min(s.storage, needed)
-            s.storage -= discharge
-            storage_discharge = discharge
-
-        return diesel, served, s.storage, storage_discharge
+        return grid, served
 
 
 # =========================================================
 # MAIN WINDOW
 # =========================================================
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
-
     def __init__(self):
         super().__init__()
-
         # ----------------- SIMULATION TIME --------------------------
         self.simulation_time = 0.0
         self.dt = 0.1
@@ -110,9 +89,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.controller = EnergyController()
 
         self.history = deque(maxlen=200)
-
-        self._setup_indicators()
-        self.init_ui_state()
 
         QtCore.QTimer.singleShot(0, self.step)
 
@@ -136,39 +112,16 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.horizontalSlider_3.valueChanged.connect(lambda v: self.set_load(2, v))
 
         self.verticalSlider_1.valueChanged.connect(self.set_pv)
-        self.verticalSlider_2.valueChanged.connect(self.set_diesel)
+        self.verticalSlider_2.valueChanged.connect(self.set_grid)
 
         self.pushButton_1.clicked.connect(self.toggle_pv)
         self.pushButton_3.clicked.connect(self.closeAll)
 
-    # =====================================================
-    # INDICATORS SETUP
-    # =====================================================
-    def _setup_indicators(self):
-
-        leds = [self.checkBox, self.checkBox_2, self.checkBox_3,
-        self.checkBox_7, self.checkBox_8, self.checkBox_9]
-        for led in leds:
-            led.setEnabled(False)
-            led.setFocusPolicy(QtCore.Qt.NoFocus)
-            led.setChecked(False)
-
-    def update_indicators(self, served):
-        self.checkBox.setChecked(served[0])
-        self.checkBox_3.setChecked(served[1])
-        self.checkBox_2.setChecked(served[2])
-        self.checkBox_7.setChecked(served[0])
-        self.checkBox_8.setChecked(served[1])
-        self.checkBox_9.setChecked(served[2])
-
-    def init_ui_state(self):
-        # force model reset
+    # ----------------------- LED INDICATORS --------------
         self.state.load = [0, 0, 0]
-
         self.state.pv = 0
-        self.state.diesel = 0
+        self.state.grid = 0
 
-        # sliders reset
         self.horizontalSlider_1.setValue(0)
         self.horizontalSlider_2.setValue(0)
         self.horizontalSlider_3.setValue(0)
@@ -176,21 +129,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.verticalSlider_1.setValue(0)
         self.verticalSlider_2.setValue(0)
 
-        # checkboxes OFF
-        self.checkBox.setChecked(False)
-        self.checkBox_2.setChecked(False)
-        self.checkBox_3.setChecked(False)
-        self.checkBox_7.setChecked(False)
-        self.checkBox_8.setChecked(False)
-        self.checkBox_9.setChecked(False)
-
     # =====================================================
     # SIMULATION LOOP
     # =====================================================
     def step(self):
-
-        diesel, served = self.controller.compute(self.state)
-        self.state.diesel = diesel
+        grid, served = self.controller.compute(self.state)
+        self.state.grid = grid
 
         effective_load = [
             self.state.load[i] if served[i] else 0
@@ -198,7 +142,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         ]
 
         pv = self.state.pv if self.state.pv_on else 0
-        gen = pv + diesel
+        gen = pv + grid
 
         load = sum(effective_load)
 
@@ -206,7 +150,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # ---------------- UI ----------------
         self.lcdNumber_8.display(balance)
-        self.lcdNumber_7.display(diesel)
+        self.lcdNumber_7.display(grid)
         self.lcdNumber_9.display(gen)
         self.lcdNumber_10.display(load)
 
@@ -214,15 +158,21 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.lcdNumber_2.display(effective_load[1])
         self.lcdNumber_3.display(effective_load[2])
 
+        self.checkBox.setChecked(self.state.load[0] > 0)
+        self.checkBox_3.setChecked(self.state.load[1] > 0)
+        self.checkBox_2.setChecked(self.state.load[2] > 0)
+
+        self.checkBox_7.setChecked(self.state.load[0] > 0)
+        self.checkBox_8.setChecked(self.state.load[1] > 0)
+        self.checkBox_9.setChecked(self.state.load[2] > 0)
+
         self.lcdNumber_6.display(pv)
 
         # ---------------- GRAPH ----------------
         self.history.append(balance)
         self.curve.setData(list(self.history))
 
-        # ---------------- INDICATORS ----------------
-        self.update_indicators(served)
-
+        # ------------- set led slider to 0 if it breaks ----------------
         sliders = [
             self.horizontalSlider_1,
             self.horizontalSlider_2,
@@ -243,12 +193,15 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     # =====================================================
     def set_load(self, i, value):
         self.state.load[i] = value
+        print(f"Càrrega led val {value}")
 
     def set_pv(self, value):
         self.state.pv = value
+        print(f"Solar val: {value}")
 
-    def set_diesel(self, value):
-        self.state.diesel_base = value
+    def set_grid(self, value):
+        self.state.grid_base = value
+        print(f"grid val: {value}")
 
     # solar toggle WITH SLIDER RESET
     def toggle_pv(self):
@@ -260,8 +213,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.verticalSlider_1.setValue(0)
             self.verticalSlider_1.setEnabled(False)
             self.verticalSlider_1.blockSignals(False)
+            print("S'ha desconectat la FV")
         else:
             self.verticalSlider_1.setEnabled(True)
+            print("S'ha connectat la FV")
 
     # =====================================================
     # CLOSE BOTH WINDOWS
@@ -269,6 +224,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def closeAll(self):
         self.graph_win.close()
         self.close()
+        print("S'ha apagat la aplicació")
 
 
 # =========================================================

@@ -32,7 +32,7 @@ import serial, time, random, sys
 USE_SERIAL = False
 
 # Aqui comienzan los métodos del UI
-from ui_v2 import *  # importo todo lo declarado en la UI
+from ui_v1 import *  # importo todo lo declarado en la UI
 from PyQt5.QtCore import QTimer # importo temporizador
 
 
