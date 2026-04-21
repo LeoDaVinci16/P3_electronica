@@ -1,210 +1,223 @@
 # -*- coding: utf-8 -*-
 
-from PyQt5 import QtCore, QtWidgets
-import pyqtgraph as pg
+from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import QTimer
-from ui_v2 import *
+import pyqtgraph as pg
+from collections import deque
+
+from ui_v2 import Ui_MainWindow
 
 
-# -------------------------------
+# =========================================================
 # MODEL
-# -------------------------------
-class EnergySystem:
+# =========================================================
+class EnergyState:
     def __init__(self):
-        self.carga = [0, 0, 0]          # requested loads
-        self.carga_on = [True, True, True]  # actual delivered loads
+        self.load = [0, 0, 0]
+        self.load_enabled = [True, True, True]
 
         self.pv = 0
         self.pv_on = True
 
-        self.diesel = 0
         self.diesel_base = 0
-        self.generador_on = True
+        self.diesel = 0
 
 
-# -------------------------------
+# =========================================================
 # CONTROLLER
-# -------------------------------
-class DieselController:
-    def update(self, system: EnergySystem):
+# =========================================================
+class EnergyController:
 
-        pv = system.pv if system.pv_on else 0
+    def compute(self, s: EnergyState):
 
-        red_demand = system.carga[0]
+        pv = s.pv if s.pv_on else 0
+        critical = s.load[0] 
 
-        # ----------------------------
-        # CRITICAL LOGIC (RED ONLY)
-        # ----------------------------
+        diesel = s.diesel_base
 
-        if pv >= red_demand:
-            # PV alone is enough → no diesel needed
-            system.carga_on[0] = True
-            system.diesel = 0
+        served = [False, False, False]
+        served[0] = critical > 0
+        served[1] = s.load[1] > 0
+        served[2] = s.load[2] > 0
 
-        else:
-            # PV not enough → diesel covers the gap
-            missing = red_demand - pv
-            system.diesel = missing
-            system.carga_on[0] = True
+        if pv < critical:
+            diesel = max(s.diesel_base, critical - pv)
 
-        # ----------------------------
-        # NON-CRITICAL LOADS (BLUE/GREEN)
-        # only use surplus energy
-        # ----------------------------
+        supply = pv + diesel
+        spare = max(0, supply - critical)
 
-        available = max(0, pv + system.diesel - red_demand)
-
-        # BLUE (index 1)
-        if available >= system.carga[1]:
-            system.carga_on[1] = True
-            available -= system.carga[1]
-        else:
-            system.carga_on[1] = False
-
-        # GREEN (index 2)
-        if available >= system.carga[2]:
-            system.carga_on[2] = True
-            available -= system.carga[2]
-        else:
-            system.carga_on[2] = False
+        return diesel, served
 
 
-# -------------------------------
+# =========================================================
 # MAIN WINDOW
-# -------------------------------
+# =========================================================
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
+
     def __init__(self):
         super().__init__()
 
-        self.system = EnergySystem()
-        self.controller = DieselController()
-
         self.setupUi(self)
+
+        self.state = EnergyState()
+        self.controller = EnergyController()
+
+        self.history = deque(maxlen=200)
+
+        self._setup_indicators()
+        self.init_ui_state()
+
+        QtCore.QTimer.singleShot(0, self.step)
+
+        # ---------------- GRAPH WINDOW ----------------
+        self.graph_win = pg.GraphicsLayoutWidget(title="Balanç Energètic")
+        self.graph_win.resize(800, 400)
+
+        self.plot = self.graph_win.addPlot(title="Balance")
+        self.curve = self.plot.plot()
+
+        self.graph_win.show()
 
         # ---------------- TIMER ----------------
         self.timer = QTimer()
-        self.timer.timeout.connect(self.updateSystem)
+        self.timer.timeout.connect(self.step)
         self.timer.start(100)
 
-        # ---------------- BUTTONS ----------------
-        self.pushButton_1.clicked.connect(self.toggleSolar)
-        self.pushButton_2.clicked.connect(self.toggleDiesel)
+        # ---------------- INPUTS ----------------
+        self.horizontalSlider_1.valueChanged.connect(lambda v: self.set_load(0, v))
+        self.horizontalSlider_2.valueChanged.connect(lambda v: self.set_load(1, v))
+        self.horizontalSlider_3.valueChanged.connect(lambda v: self.set_load(2, v))
+
+        self.verticalSlider_1.valueChanged.connect(self.set_pv)
+        self.verticalSlider_2.valueChanged.connect(self.set_diesel)
+
+        self.pushButton_1.clicked.connect(self.toggle_pv)
         self.pushButton_3.clicked.connect(self.closeAll)
 
-        # ---------------- SLIDERS ----------------
-        self.horizontalSlider_1.valueChanged.connect(lambda v: self.setCarga(0, v))
-        self.horizontalSlider_2.valueChanged.connect(lambda v: self.setCarga(1, v))
-        self.horizontalSlider_3.valueChanged.connect(lambda v: self.setCarga(2, v))
+    # =====================================================
+    # INDICATORS SETUP
+    # =====================================================
+    def _setup_indicators(self):
 
-        self.verticalSlider_1.valueChanged.connect(self.setPV)
-        self.verticalSlider_2.valueChanged.connect(self.setDiesel)
+        leds = [self.checkBox, self.checkBox_2, self.checkBox_3,
+        self.checkBox_7, self.checkBox_8, self.checkBox_9]
+        for led in leds:
+            led.setEnabled(False)
+            led.setFocusPolicy(QtCore.Qt.NoFocus)
+            led.setChecked(False)
 
-    # ---------------- SYSTEM LOOP ----------------
-    def updateSystem(self):
+    def update_indicators(self, served):
+        self.checkBox.setChecked(served[0])
+        self.checkBox_3.setChecked(served[1])
+        self.checkBox_2.setChecked(served[2])
+        self.checkBox_7.setChecked(served[0])
+        self.checkBox_8.setChecked(served[1])
+        self.checkBox_9.setChecked(served[2])
 
-        global curva, dataN, dataY, lastN, win
+    def init_ui_state(self):
+        # force model reset
+        self.state.load = [0, 0, 0]
 
-        self.controller.update(self.system)
+        self.state.pv = 0
+        self.state.diesel = 0
 
-        gen = (self.system.pv if self.system.pv_on else 0) + self.system.diesel
+        # sliders reset
+        self.horizontalSlider_1.setValue(0)
+        self.horizontalSlider_2.setValue(0)
+        self.horizontalSlider_3.setValue(0)
+
+        self.verticalSlider_1.setValue(0)
+        self.verticalSlider_2.setValue(0)
+
+        # checkboxes OFF
+        self.checkBox.setChecked(False)
+        self.checkBox_2.setChecked(False)
+        self.checkBox_3.setChecked(False)
+        self.checkBox_7.setChecked(False)
+        self.checkBox_8.setChecked(False)
+        self.checkBox_9.setChecked(False)
+
+    # =====================================================
+    # SIMULATION LOOP
+    # =====================================================
+    def step(self):
+
+        diesel, served = self.controller.compute(self.state)
+        self.state.diesel = diesel
+
+        pv = self.state.pv if self.state.pv_on else 0
+        gen = pv + diesel
+
         load = sum(
-            self.system.carga[i] if self.system.carga_on[i] else 0
+            self.state.load[i] if served[i] else 0
             for i in range(3)
         )
+
+        critical = self.state.load[0] if self.state.load_enabled[0] else 0
+        spare = max(0, gen - critical)
+
         balance = gen - load
 
-        # ---------------- LCDS ----------------
+        # ---------------- UI ----------------
         self.lcdNumber_8.display(balance)
-        self.lcdNumber_7.display(self.system.diesel)
+        self.lcdNumber_7.display(diesel)
         self.lcdNumber_9.display(gen)
         self.lcdNumber_10.display(load)
 
-        # ---------------- UPDATE LOAD DISPLAY (REAL OUTPUT) ----------------
-        self.refreshLoads()
+        self.lcdNumber_1.display(self.state.load[0] if served[0] else 0)
+        self.lcdNumber_2.display(self.state.load[1] if served[1] else 0)
+        self.lcdNumber_3.display(self.state.load[2] if served[2] else 0)
 
-        # ---------------- BUTTON TEXT ----------------
-        self.pushButton_1.setText("Solar ON" if self.system.pv_on else "Solar OFF")
-        self.pushButton_2.setText("Diesel ON" if self.system.generador_on else "Diesel OFF")
+        self.lcdNumber_6.display(pv)
 
         # ---------------- GRAPH ----------------
-        dataY.append(balance)
-        dataN.append(lastN)
-        lastN += 1
+        self.history.append(balance)
+        self.curve.setData(list(self.history))
 
-        if len(dataN) > 200:
-            dataN = dataN[-200:]
-            dataY = dataY[-200:]
+        # ---------------- INDICATORS ----------------
+        self.update_indicators(served)
 
-        curva.setData(dataN, dataY)
+    # =====================================================
+    # INPUT HANDLERS
+    # =====================================================
+    def set_load(self, i, value):
+        self.state.load[i] = value
+        self.state.load_enabled[i] = value > 0
 
-    # ---------------- LOAD DISPLAY ----------------
-    def refreshLoads(self):
-        self.lcdNumber_1.display(self.system.carga[0] if self.system.carga_on[0] else 0)
-        self.lcdNumber_2.display(self.system.carga[1] if self.system.carga_on[1] else 0)
-        self.lcdNumber_3.display(self.system.carga[2] if self.system.carga_on[2] else 0)
+    def set_pv(self, value):
+        self.state.pv = value
 
-    # ---------------- INPUTS ----------------
-    def setCarga(self, i, value):
-        self.system.carga[i] = value
-        if value > 0:
-            self.system.carga_on[i] = True
+    def set_diesel(self, value):
+        self.state.diesel_base = value
 
-    def setPV(self, value):
-        if self.system.pv_on:
-            self.system.pv = value
+    # solar toggle WITH SLIDER RESET
+    def toggle_pv(self):
+        self.state.pv_on = not self.state.pv_on
+
+        if not self.state.pv_on:
+            self.state.pv = 0
+            self.verticalSlider_1.blockSignals(True)
+            self.verticalSlider_1.setValue(0)
+            self.verticalSlider_1.setEnabled(False)
+            self.verticalSlider_1.blockSignals(False)
         else:
-            self.system.pv = 0
-        self.lcdNumber_6.display(self.system.pv)
+            self.verticalSlider_1.setEnabled(True)
 
-    def setDiesel(self, value):
-        self.system.diesel_base = value
-        self.lcdNumber_7.display(value)
-
-    # ---------------- BUTTONS ----------------
-    def toggleSolar(self):
-        self.system.pv_on = not self.system.pv_on
-        if not self.system.pv_on:
-            self.system.pv = 0
-        self.lcdNumber_6.display(self.system.pv)
-
-    def toggleDiesel(self):
-        self.system.generador_on = not self.system.generador_on
-        if not self.system.generador_on:
-            self.system.diesel = 0
-
-    # ---------------- CLOSE ALL ----------------
+    # =====================================================
+    # CLOSE BOTH WINDOWS
+    # =====================================================
     def closeAll(self):
-        global win
-        try:
-            win.close()
-        except:
-            pass
+        self.graph_win.close()
         self.close()
 
 
-# -------------------------------
-# GRAPH
-# -------------------------------
-app = QtWidgets.QApplication.instance()
-if app is None:
-    app = QtWidgets.QApplication([])
-
-win = pg.GraphicsLayoutWidget(title="Balanç Energètic")
-win.show()
-
-p = win.addPlot(title="Balance")
-curva = p.plot(pen='y')
-p.enableAutoRange(axis='y')
-
-dataN = []
-dataY = []
-lastN = 0
-
-
-# -------------------------------
+# =========================================================
 # MAIN
-# -------------------------------
+# =========================================================
 if __name__ == "__main__":
-    window = MainWindow()
-    window.show()
-    app.exec_()
+    import sys
+
+    app = QtWidgets.QApplication(sys.argv)
+    w = MainWindow()
+    w.show()
+    sys.exit(app.exec_())
