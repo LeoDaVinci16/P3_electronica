@@ -22,31 +22,74 @@ class EnergyState:
         self.diesel_base = 0
         self.diesel = 0
 
+        self.storage = 0.0   # NEW
+
 
 # =========================================================
 # CONTROLLER
 # =========================================================
 class EnergyController:
 
-    def compute(self, s: EnergyState):
-
+    def compute(self, s):
         pv = s.pv if s.pv_on else 0
-        critical = s.load[0] 
-
         diesel = s.diesel_base
 
+        gen = pv + diesel
+
+        load = s.load[:]  # [red, green, blue]
+
         served = [False, False, False]
-        served[0] = critical > 0
-        served[1] = s.load[1] > 0
-        served[2] = s.load[2] > 0
+        remaining = gen
 
-        if pv < critical:
-            diesel = max(s.diesel_base, critical - pv)
+        # --------------------------------------------------
+        # STEP 1: NON-CRITICAL FIRST (green, blue)
+        # they can fail naturally
+        # --------------------------------------------------
+        for i in (1, 2):
+            if remaining >= load[i]:
+                served[i] = True
+                remaining -= load[i]
 
-        supply = pv + diesel
-        spare = max(0, supply - critical)
+        # --------------------------------------------------
+        # STEP 2: CRITICAL LOAD (red)
+        # must be served if possible
+        # diesel is adjusted ONLY here
+        # --------------------------------------------------
+        red = load[0]
 
-        return diesel, served
+        if remaining >= red:
+            served[0] = True
+            remaining -= red
+        else:
+            missing = red - remaining
+
+            # diesel compensates ONLY for critical
+            diesel += missing
+            gen += missing
+
+            served[0] = True
+            remaining = 0
+
+        # --------------------------------------------------
+        # STEP 3: STORAGE (infinite battery) (New)
+        # --------------------------------------------------
+
+        total_load = sum(load[i] if served[i] else 0 for i in range(3))
+
+        net = gen - total_load
+
+        # charge or discharge
+        if net >= 0:
+            s.storage += net
+            storage_discharge = 0
+        else:
+            needed = -net
+
+            discharge = min(s.storage, needed)
+            s.storage -= discharge
+            storage_discharge = discharge
+
+        return diesel, served, s.storage, storage_discharge
 
 
 # =========================================================
@@ -56,6 +99,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def __init__(self):
         super().__init__()
+
+        # ----------------- SIMULATION TIME --------------------------
+        self.simulation_time = 0.0
+        self.dt = 0.1
 
         self.setupUi(self)
 
@@ -145,16 +192,15 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         diesel, served = self.controller.compute(self.state)
         self.state.diesel = diesel
 
+        effective_load = [
+            self.state.load[i] if served[i] else 0
+            for i in range(3)
+        ]
+
         pv = self.state.pv if self.state.pv_on else 0
         gen = pv + diesel
 
-        load = sum(
-            self.state.load[i] if served[i] else 0
-            for i in range(3)
-        )
-
-        critical = self.state.load[0] if self.state.load_enabled[0] else 0
-        spare = max(0, gen - critical)
+        load = sum(effective_load)
 
         balance = gen - load
 
@@ -164,9 +210,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.lcdNumber_9.display(gen)
         self.lcdNumber_10.display(load)
 
-        self.lcdNumber_1.display(self.state.load[0] if served[0] else 0)
-        self.lcdNumber_2.display(self.state.load[1] if served[1] else 0)
-        self.lcdNumber_3.display(self.state.load[2] if served[2] else 0)
+        self.lcdNumber_1.display(effective_load[0]) 
+        self.lcdNumber_2.display(effective_load[1])
+        self.lcdNumber_3.display(effective_load[2])
 
         self.lcdNumber_6.display(pv)
 
@@ -177,12 +223,26 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # ---------------- INDICATORS ----------------
         self.update_indicators(served)
 
+        sliders = [
+            self.horizontalSlider_1,
+            self.horizontalSlider_2,
+            self.horizontalSlider_3
+        ]
+
+        for i in (1, 2):
+            if not served[i] and sliders[i].value() != 0:
+                sliders[i].setValue(0)
+
+        # time:
+        self.simulation_time += self.dt
+        self.lcdNumber_time.display(self.simulation_time)
+        self.label_time.setText(f"Time: {self.simulation_time:.1f} s")
+
     # =====================================================
     # INPUT HANDLERS
     # =====================================================
     def set_load(self, i, value):
         self.state.load[i] = value
-        self.state.load_enabled[i] = value > 0
 
     def set_pv(self, value):
         self.state.pv = value
