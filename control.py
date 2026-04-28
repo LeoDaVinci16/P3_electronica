@@ -267,8 +267,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.lcdNumber_3.display(effective_load[2] * self.state.escala_I)
 
         # --- Schematic Displays (Esquema) ---
-        self.lcdNumber.display(float(f"{p_solar_w:.1f}"))        # Solar power W
-        self.lcdNumber_4.display(float(f"{p_grid_w:.1f}"))    # Grid power W
+        self.lcdNumber.display(float(f"{p_solar_w / self.state.V_bus:.1f}"))        # Solar power W
+        self.lcdNumber_4.display(float(f"{p_grid_w / self.state.V_bus:.1f}"))    # Grid power W
         self.lcdNumber_5.display(float(f"{self.state.V_bus:.2f}")) # Bus Voltage
         
         # SoC calculation (0-15V range mapped to 0-100%)

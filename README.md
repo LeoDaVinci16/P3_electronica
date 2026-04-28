@@ -11,7 +11,7 @@ Podeu trobar el projecte al següent link: https://github.com/LeoDaVinci16/P3_el
 
 ## 🖥️ SCADA
 
-La finestra de l'SCADA permet manipular les càrregues i visualitzar els fluxos de potencia, l'estat de les diferents variables del sistema simulat i el temps de simulació. Està dividida en 5 blocs principals:
+La finestra de l'SCADA permet manipular les càrregues i visualitzar els fluxos de potencia, l'estat de les diferents variables i el temps de simulació. Està dividida en 5 blocs principals:
 
 
 ### Potencia d'entrada
