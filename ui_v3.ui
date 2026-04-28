@@ -304,19 +304,6 @@
       <string>W</string>
      </property>
     </widget>
-    <widget class="QLabel" name="label_3">
-     <property name="geometry">
-      <rect>
-       <x>220</x>
-       <y>130</y>
-       <width>131</width>
-       <height>16</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>MANUAL/FORCED</string>
-     </property>
-    </widget>
    </widget>
    <widget class="QGroupBox" name="groupBox_2">
     <property name="geometry">
@@ -1269,7 +1256,7 @@ color: rgb(255, 255, 255)</string>
       <enum>Qt::NoContextMenu</enum>
      </property>
      <property name="text">
-      <string>Condensador</string>
+      <string>Condensador:</string>
      </property>
     </widget>
     <widget class="QLCDNumber" name="lcdNumber_11">
@@ -3033,7 +3020,7 @@ color: rgb(255, 255, 255)</string>
       <rect>
        <x>250</x>
        <y>100</y>
-       <width>71</width>
+       <width>81</width>
        <height>21</height>
       </rect>
      </property>
@@ -3041,7 +3028,7 @@ color: rgb(255, 255, 255)</string>
       <string notr="true">background-color: rgb(255, 255, 255);</string>
      </property>
      <property name="text">
-      <string>Condensor</string>
+      <string>Condensador</string>
      </property>
     </widget>
     <widget class="QLCDNumber" name="lcdNumber_14">
@@ -3386,8 +3373,8 @@ color: rgb(255, 255, 255)</string>
       <rect>
        <x>620</x>
        <y>120</y>
-       <width>61</width>
-       <height>16</height>
+       <width>51</width>
+       <height>21</height>
       </rect>
      </property>
      <property name="styleSheet">
@@ -3395,6 +3382,22 @@ color: rgb(255, 255, 255)</string>
      </property>
      <property name="text">
       <string>Ampers</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_23">
+     <property name="geometry">
+      <rect>
+       <x>150</x>
+       <y>40</y>
+       <width>111</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">background-color: rgb(255, 255, 255);</string>
+     </property>
+     <property name="text">
+      <string>Tensió del bus:</string>
      </property>
     </widget>
     <zorder>label_20</zorder>
@@ -3413,6 +3416,7 @@ color: rgb(255, 255, 255)</string>
     <zorder>checkBox_8</zorder>
     <zorder>label_21</zorder>
     <zorder>label_22</zorder>
+    <zorder>label_23</zorder>
    </widget>
    <widget class="QGroupBox" name="groupBox_5">
     <property name="geometry">
@@ -3435,23 +3439,10 @@ color: rgb(255, 255, 255)</string>
        <height>81</height>
       </rect>
      </property>
-     <property name="text">
-      <string>TextLabel</string>
-     </property>
-    </widget>
-    <widget class="QLabel" name="label_time">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>250</y>
-       <width>341</width>
-       <height>31</height>
-      </rect>
-     </property>
      <property name="font">
       <font>
        <family>Arial</family>
-       <pointsize>20</pointsize>
+       <pointsize>12</pointsize>
       </font>
      </property>
      <property name="text">

@@ -6,7 +6,6 @@ import pyqtgraph as pg
 from collections import deque
 from ui_v3 import Ui_MainWindow
 
-
 # =========================================================
 # MODEL
 # =========================================================
@@ -25,17 +24,17 @@ class EnergyState:
 
                 # ------------ DADES DE SOLAR ----------------
         self.V_bus = 10.0         # Tensió nominal (V)
-        self.C = 5.0              # Capacitat ajustada per a corrents de max 25.5A
-        self.dt = 0.02            # Pas de temps (20ms)
-        self.escala_I = 0.1         # Factor de conversió: Slider 255 -> 25.5 Amperis
+        self.C = 50.0             # Capacitat ajustada per a corrents de max 25.5A
+        self.dt = 1.0             # Pas de temps (1 h) per cada punt de dades solar
+        self.escala_I = 0.1       # Factor de conversió: Slider 100 -> 10 Amperis
         try:
-            nom_fitxer = 'Timeseries_41.394_2.165_SA3_39deg_0deg_2023_2023.csv'
+            nom_fitxer = 'irradiancia.csv'
 
             df = pd.read_csv(nom_fitxer, skiprows=8, skipfooter=10, engine='python')
             df['time'] = pd.to_datetime(df['time'], format='%Y%m%d:%H%M')
             
             # Filtre de setmana (168 hores)
-            df_setmana = df.iloc[0:168] 
+            df_setmana = df.iloc[0:8760] 
             
             self.dades_irradiancia = df_setmana['G(i)'].values
             self.dades_temps = df_setmana['time'].dt.strftime('%Y%m%d:%H%M').values
@@ -85,9 +84,10 @@ class EnergyController:
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
-        # ----------------- SIMULATION TIME --------------------------
-        self.simulation_time = 0.0
-        self.dt = 0.1
+        self.state = EnergyState()
+        # ----------------- SIMULATION TIME --------------------------        
+        self.simulation_time = 0.0        
+        self.dt = self.state.dt
 
         self.setupUi(self)
 
@@ -112,11 +112,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         self.lcdNumber_8.setDigitCount(5) # Bus Voltage (e.g. 10.00)
 
-        self.state = EnergyState()
         self.controller = EnergyController()
 
         # History deques for plotting
-        self.hist_vbus = deque(maxlen=200)
+        self.hist_vbus = deque(maxlen=500)
         self.hist_soc = deque(maxlen=200)
         self.hist_solar = deque(maxlen=200)
         self.hist_grid = deque(maxlen=200)
@@ -161,7 +160,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # ---------------- TIMER ----------------
         self.timer = QTimer()
         self.timer.timeout.connect(self.step)
-        self.timer.start(60)
+        
+        # Simulation Speed Control:
+        # A interval of 1000ms (1s) means 1 hour of solar data passes every second.
+        # Decrease this value (e.g., 20ms) to make the simulation go much faster.
+        self.timer.start(100) # Current speed: 10 steps per second (10 hours/sec)
 
         # ---------------- INPUTS ----------------
         self.horizontalSlider_1.valueChanged.connect(lambda v: self.set_load(0, v))
@@ -241,11 +244,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             self.toggle_pv()
 
         ts = self.state.dades_temps[self.index_hora]
-        self.label_date.setText(f"Simulació 10V | {ts[6:8]}/{ts[4:6]} {ts[9:11]}:00")
+        self.label_date.setText(f"Durada total de la simulació: {self.simulation_time:.1f} h \nData: {ts[6:8]}/{ts[4:6]}/2023 {ts[9:11]}:00 h")
 
         # 4. LCDs (All Power values shown in W)
         p_solar_w = (i_pv * self.state.V_bus)
-        p_grid_w = (i_grid * self.state.V_bus)
+        p_grid_w = (i_grid * self.state.V_bus)  
 
         self.lcdNumber_6.display(float(f"{p_solar_w:.1f}"))
         self.lcdNumber_7.display(float(f"{p_grid_w:.1f}"))
@@ -300,8 +303,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         sliders = [
             self.horizontalSlider_1,
             self.horizontalSlider_2,
-            self.horizontalSlider_3
-        ]
+            self.horizontalSlider_3]
 
         for i in (1, 2):
             if not served[i] and sliders[i].value() != 0:
@@ -309,22 +311,14 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # time:
         self.simulation_time += self.dt
-        self.label_time.setText(f"Time: {self.simulation_time:.1f} s")
-
     # =====================================================
     # INPUT HANDLERS
     # =====================================================
     def set_load(self, i, value):
         self.state.load[i] = value
-        print(f"Càrrega led val {value}")
-
-    def set_pv(self, value):
-        self.state.pv = value
-        print(f"Solar val: {value}")
 
     def set_grid(self, value):
         self.state.grid_base = value
-        print(f"La xarxa val: {value}")
 
     # solar toggle WITH SLIDER RESET
     def toggle_pv(self):

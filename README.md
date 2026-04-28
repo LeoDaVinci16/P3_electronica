@@ -26,12 +26,13 @@ Assegureu-vos de tenir Python 3.x instal·lat. També necessitareu les següents
 pip install PyQt5 pyqtgraph pyserial
 ```
 
-## ⚙️ Installation & Usage
+## ⚙️ Instalació i us
 
 ### 1. UI Compilation
 If you modify the `.ui` file in Qt Designer, you must re-generate the Python UI class:
 
 ```bash
+pyrcc5 dibuix.qrc -o dibuix_rc.py
 pyuic5 ui_v1.ui -o control_ui_v1.py
 ```
 
@@ -39,7 +40,6 @@ pyuic5 ui_v1.ui -o control_ui_v1.py
 To launch the SCADA interface:
 
 ```bash
-pyrcc5 dibuix.qrc -o dibuix_rc.py
 python control_v1.py
 ```
 
