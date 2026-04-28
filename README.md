@@ -1,5 +1,4 @@
-# Sistema SCADA control de càrregues
-**Guillem Castillo i Arnau Coronado**
+# Sistema SCADA pel control de càrregues
 
 Aquest projecte implementa una interfície SCADA (Supervisory Control and Data Acquisition) en temps real per gestionar un sistema energètic híbrid que consta de generació fotovoltaica (FV), una conexió a la xarxa i múltiples càrregues de consum.
 
@@ -7,13 +6,20 @@ El sistema està dissenyat per monitoritzar el balanç energètic i assegurar qu
 
 El simulador, un cop inicialitzat el programa control_v3.py obre dues pestanyes. En la primera és el control SCADA del sistema simulat, mentre l’altra és una interfície que mostra l’evolució gràfica de diversos paràmetres del sistema.
 
+Podeu trobar el projecte al següent link: https://github.com/LeoDaVinci16/P3_electronica
 
-## 🚀 SCADA
+
+## 🖥️ SCADA
+
+La finestra de l'SCADA permet manipular les càrregues i visualitzar els fluxos de potencia, l'estat de les diferents variables del sistema simulat i el temps de simulació. Està dividida en 5 blocs principals:
+
 
 ### Potencia d'entrada
 A la part superior esquerra de la interfície gràfica hi ha el requadre de potencia d’entrada. En aquest requadre hi ha els següents elements:
-- Dos marcadors que mostren la **quantitat d’energia generada**. Pot ser d’origen solar i l’energia injectada des de la xarxa elèctrica en Watts. L’energia solar és determinada per un arxiu d’irradiàncies anual hora a hora a la localitat de Barcelona, extret del PVGiS. L’energia aportada per la xarxa es controla amb un control  proporcional que mou automaticament l’slider que hi ha al costat del marcador.
-- Just a sota hi ha un marcador on mostra la potència global total disponible solar + xarxa.
+- Dos marcadors que mostren la quantitat d’energia generada.
+    - L’energia solar és determinada per un arxiu d’irradiàncies anual hora a hora a la localitat de Barcelona, extret del PVGiS.
+    - L’energia aportada per la xarxa es controla amb un control  proporcional que mou automaticament l’slider que hi ha al costat del marcador.
+- Just a sota hi ha un marcador on mostra la potència global total disponible: solar + xarxa.
 
 ### Potencia consumida
 A la part superior dreta hi ha el requadre d’energia consumida. Dins d’aquest hi ha els següents elements:
@@ -40,13 +46,21 @@ A la part inferior  hi ha el requadre “Esquema”, que mostra un esquema del c
     - Corrent subministrada o consumida pel condensador.
     - Corrent consumida per cadascuna de les càrregues.
 
+![alt text](circuit.png)
+
 ### Simulació
+Finalment hi ha un requadre que mostra el temps de simulació, la data (a partir de les dades d'irradiancia fotovoltaica) i el botó "exit" que serveix per tancar la finestra de l'SCADA i la dels gràfics en un sol clic.
 
-Finalment hi ha un requadre amb el temps de simulació, la data (a partir de les dades d'irradiancia fotovoltaica) i el botó "exit" serveix per tancar la finestra de l'SCADA i la dels gràfics en un sol clic.
+## 📈Gràfics en temps real
 
-## Gràfics en temps real
+Quan s'executa el progama a banda de l'SCADA s'obre una finestra amb les gràfiques en temps real que mostren les següents corbes:
 
-- **Gràfics en temps real**: Visualitza el balanç energètic net (Generació - Consum) utilitzant `pyqtgraph`.
+- Tensió del Bus (V)
+- Estat de Càrrega SoC (%)
+- Potències (W)
+    - Solar
+    - Xarxa
+    - Consum
 
 
 ## 🛠️ Estructura del projecte
@@ -83,11 +97,13 @@ Per iniciar la interfície SCADA:
 python control_v1.py
 ```
 
-### 3. Configuració del maquinari (opcional)
+### 3. Configuració del maquinari (següent pas)
 Si feu servir un ESP32:
 1. Instal·leu `uControl.py` al vostre ESP32 amb Thonny o rshell.
 2. Connecteu l'ESP32 mitjançant USB.
-3. Assegureu-vos que `USE_SERIAL` estigui definit com a `True` a la configuració (si escau).
+3. Definir els ports i implementar el sistema físic.
 
 ---
+*Autors: Guillem Castillo i Arnau Coronado*
+
 *Desenvolupat com a part del Màster en Enginyeria Electrònica (P3 Electrònica).*
