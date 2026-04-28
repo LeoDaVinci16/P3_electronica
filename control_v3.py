@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import pandas as pd
-from PyQt5 import QtWidgets, QtCore
+from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtCore import QTimer
 import pyqtgraph as pg
 from collections import deque
@@ -91,11 +91,25 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         self.setupUi(self)
 
-        # Adjust digit counts to avoid blank displays or precision loss (kW often needs more digits)
         for lcd in [self.lcdNumber_6, self.lcdNumber_7, self.lcdNumber_9, self.lcdNumber_10,
+                    self.lcdNumber_1, self.lcdNumber_2, self.lcdNumber_3,
                     self.lcdNumber, self.lcdNumber_4, self.lcdNumber_12,
                     self.lcdNumber_13, self.lcdNumber_14, self.lcdNumber_15]:
-            lcd.setDigitCount(6)
+            lcd.setDigitCount(5)
+
+        from PyQt5 import QtGui
+
+        def set_lcd_color(lcd, color):
+            pal = lcd.palette()
+            pal.setColor(QtGui.QPalette.WindowText, QtGui.QColor(color))
+            lcd.setPalette(pal)
+            lcd.setStyleSheet("")
+            lcd.setSegmentStyle(QtWidgets.QLCDNumber.Flat)
+
+        set_lcd_color(self.lcdNumber_1, "red")
+        set_lcd_color(self.lcdNumber_2, "blue")
+        set_lcd_color(self.lcdNumber_3, "green")
+
         self.lcdNumber_8.setDigitCount(5) # Bus Voltage (e.g. 10.00)
 
         self.state = EnergyState()
@@ -135,8 +149,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         
         self.graph_win.nextRow()
         
-        # Plot 3: Powers (kW)
-        self.p3 = self.graph_win.addPlot(title="Potències (kW)")
+        # Plot 3: Powers (W)
+        self.p3 = self.graph_win.addPlot(title="Potències (W)")
         self.p3.showGrid(x=True, y=True)
         self.p3.addLegend()
         self.curve_solar = self.p3.plot(pen=pg.mkPen('orange', width=2), name='Solar')
@@ -154,10 +168,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.horizontalSlider_2.valueChanged.connect(lambda v: self.set_load(1, v))
         self.horizontalSlider_3.valueChanged.connect(lambda v: self.set_load(2, v))
 
-        self.verticalSlider_1.valueChanged.connect(self.set_pv)
         self.verticalSlider_2.valueChanged.connect(self.set_grid)
 
-        self.pushButton_1.clicked.connect(self.toggle_pv)
         self.pushButton_3.clicked.connect(self.closeAll)
 
     # ----------------------- LED INDICATORS --------------
@@ -169,7 +181,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.horizontalSlider_2.setValue(0)
         self.horizontalSlider_3.setValue(0)
 
-        self.verticalSlider_1.setValue(0)
         self.verticalSlider_2.setValue(0)
 
     # =====================================================
@@ -205,11 +216,11 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # i_grid is already in Amperes from controller
 
         # --- Load current (only served loads) ---
-        p_cons_total_kw = (i_cons_total * self.state.V_bus) / 1000.0
+        p_cons_total_w = (i_cons_total * self.state.V_bus)
 
         # --- Generation current ---
         i_gen_total = i_pv + i_grid
-        p_gen_total_kw = (i_gen_total * self.state.V_bus) / 1000.0
+        p_gen_total_w = (i_gen_total * self.state.V_bus)
 
         # --- KCL ---
         i_net = i_gen_total - i_cons_total
@@ -232,30 +243,31 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         ts = self.state.dades_temps[self.index_hora]
         self.label_date.setText(f"Simulació 10V | {ts[6:8]}/{ts[4:6]} {ts[9:11]}:00")
 
-        # 4. LCDs (All Power values shown in kW)
-        p_solar_kw = (i_pv * self.state.V_bus) / 1000.0
-        p_grid_kw = (i_grid * self.state.V_bus) / 1000.0
+        # 4. LCDs (All Power values shown in W)
+        p_solar_w = (i_pv * self.state.V_bus)
+        p_grid_w = (i_grid * self.state.V_bus)
 
-        self.lcdNumber_6.display(float(f"{p_solar_kw:.3f}"))
-        self.lcdNumber_7.display(float(f"{p_grid_kw:.3f}"))
+        self.lcdNumber_6.display(float(f"{p_solar_w:.1f}"))
+        self.lcdNumber_7.display(float(f"{p_grid_w:.1f}"))
         self.lcdNumber_8.display(float(f"{self.state.V_bus:.2f}"))
-        self.lcdNumber_9.display(float(f"{p_gen_total_kw:.3f}"))
-        self.lcdNumber_10.display(float(f"{p_cons_total_kw:.3f}"))
+        self.lcdNumber_9.display(float(f"{p_gen_total_w:.1f}"))
+        self.lcdNumber_10.display(float(f"{p_cons_total_w:.1f}"))
+        self.lcdNumber_16.display(float(f"{(i_net * self.state.V_bus):.1f}"))    # Condenser power W
 
         # Display current in Amperes for individual loads (1, 2, 3)
-        self.lcdNumber_1.display(float(f"{effective_load[0] * self.state.escala_I:.2f}")) 
-        self.lcdNumber_2.display(float(f"{effective_load[1] * self.state.escala_I:.2f}"))
-        self.lcdNumber_3.display(float(f"{effective_load[2] * self.state.escala_I:.2f}"))
+        self.lcdNumber_1.display(effective_load[0] * self.state.escala_I) 
+        self.lcdNumber_2.display(effective_load[1] * self.state.escala_I)
+        self.lcdNumber_3.display(effective_load[2] * self.state.escala_I)
 
         # --- Schematic Displays (Esquema) ---
-        self.lcdNumber.display(float(f"{p_solar_kw:.3f}"))        # Solar power kW
-        self.lcdNumber_4.display(float(f"{p_grid_kw:.3f}"))    # Grid power kW
+        self.lcdNumber.display(float(f"{p_solar_w:.1f}"))        # Solar power W
+        self.lcdNumber_4.display(float(f"{p_grid_w:.1f}"))    # Grid power W
         self.lcdNumber_5.display(float(f"{self.state.V_bus:.2f}")) # Bus Voltage
         
         # SoC calculation (0-15V range mapped to 0-100%)
         soc = (self.state.V_bus / 15.0) * 100
         self.lcdNumber_11.display(float(f"{soc:.1f}"))
-        self.lcdNumber_12.display(float(f"{(i_net * self.state.V_bus / 1000.0):.3f}"))    # Condenser power kW
+        self.lcdNumber_12.display(float(f"{(i_net):.1f}"))    # Condenser current
         
         self.lcdNumber_13.display(float(f"{effective_load[0] * self.state.escala_I:.1f}")) # Load 1 A
         self.lcdNumber_14.display(float(f"{effective_load[1] * self.state.escala_I:.1f}")) # Load 2 A
@@ -274,9 +286,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # ---------------- GRAPH ----------------
         self.hist_vbus.append(self.state.V_bus)
         self.hist_soc.append(soc)
-        self.hist_solar.append(p_solar_kw)
-        self.hist_grid.append(p_grid_kw)
-        self.hist_cons.append(p_cons_total_kw)
+        self.hist_solar.append(p_solar_w)
+        self.hist_grid.append(p_grid_w)
+        self.hist_cons.append(p_cons_total_w)
 
         self.curve_vbus.setData(list(self.hist_vbus))
         self.curve_soc.setData(list(self.hist_soc))
@@ -320,13 +332,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         if not self.state.pv_on:
             self.state.pv = 0
-            self.verticalSlider_1.blockSignals(True)
-            self.verticalSlider_1.setValue(0)
-            self.verticalSlider_1.setEnabled(False)
-            self.verticalSlider_1.blockSignals(False)
             print("S'ha desconectat la FV")
         else:
-            self.verticalSlider_1.setEnabled(True)
             print("S'ha connectat la FV")
 
     # =====================================================

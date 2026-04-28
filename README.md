@@ -1,26 +1,26 @@
-# Energy Balance SCADA System
+# Sistema SCADA de Balanç Energètic
 
-This project implements a real-time SCADA (Supervisory Control and Data Acquisition) interface to manage a hybrid energy system consisting of Photovoltaic (PV) generation, a Diesel generator, and multiple consumer loads.
+Aquest projecte implementa una interfície SCADA (Supervisory Control and Data Acquisition) en temps real per gestionar un sistema energètic híbrid que consta de generació fotovoltaica (FV), una conexió a la xarxa i múltiples càrregues de consum.
 
-The system is designed to monitor the energy balance and ensure that critical loads are always powered by automatically regulating the backup generator.
+El sistema està dissenyat per monitoritzar el balanç energètic i assegurar que la càrrega crítica sempre estigui alimentada mitjançant la regulació automàtica del generador de reserva.
 
-## 🚀 Features
+## 🚀 Característiques
 
-- **Real-time Plotting**: Visualizes the net energy balance (Generation - Consumption) using `pyqtgraph`.
-- **Automated Logic**: If Solar generation is insufficient to cover the critical load (`Carga 1`), the system automatically activates the Diesel generator and adjusts its output to meet the deficit.
-- **Interactive Dashboard**: Control PV generation levels and individual load consumption via sliders.
-- **Dual Mode**: Supports both local simulation (default in `control_v1.py`) and hardware integration via Serial communication with an ESP32.
+- **Gràfics en temps real**: Visualitza el balanç energètic net (Generació - Consum) utilitzant `pyqtgraph`.
+- **Lògica automatitzada**: Si la generació solar és insuficient per cobrir la càrrega crítica (`Carga 1`), el sistema activa automàticament el generador dièsel i ajusta la seva sortida per satisfer el dèficit.
+- **Panell de control interactiu**: Controla els nivells de consum de càrregues individuals mitjançant lliscadors.
+- **Mode dual**: Admet tant la simulació local (per defecte a `control_v1.py`) com la integració de maquinari mitjançant comunicació sèrie amb un ESP32.
 
-## 🛠️ Project Structure
+## 🛠️ Estructura del projecte
 
-- `control_v1.py`: The main application logic and GUI management.
-- `control_ui_v1.py`: Python class generated from the Qt Designer `.ui` file.
-- `uControl.py`: MicroPython script for the ESP32 to handle ADC/DAC and PWM signals.
-- `ui_file.ui`: The original design file for Qt Designer.
+- `control_v1.py`: La lògica principal de l'aplicació i la gestió de la GUI.
+- `control_ui_v1.py`: Classe Python generada a partir del fitxer `.ui` de Qt Designer.
+- `uControl.py`: Script MicroPython per a l'ESP32 per gestionar senyals ADC/DAC i PWM.
+- `ui_file.ui`: El fitxer de disseny original per a Qt Designer.
 
-## 📋 Prerequisites
+## 📋 Requisits previs
 
-Ensure you have Python 3.x installed. You will also need the following libraries:
+Assegureu-vos de tenir Python 3.x instal·lat. També necessitareu les següents llibreries:
 
 ```bash
 pip install PyQt5 pyqtgraph pyserial
@@ -39,6 +39,7 @@ pyuic5 ui_v1.ui -o control_ui_v1.py
 To launch the SCADA interface:
 
 ```bash
+pyrcc5 dibuix.qrc -o dibuix_rc.py
 python control_v1.py
 ```
 
@@ -60,4 +61,3 @@ The core logic in `muestreo()` follows these steps every 100ms:
 
 ---
 *Developed as part of the Master in Electronic Engineering (P3 Electronics).*
-
