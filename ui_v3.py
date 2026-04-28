@@ -810,7 +810,7 @@ class Ui_MainWindow(object):
         self.label_3.setText(_translate("MainWindow", "MANUAL/FORCED"))
         self.groupBox_2.setTitle(_translate("MainWindow", "Potència de sortida"))
         self.label_9.setText(_translate("MainWindow", "POTÈNCIA CONSUMIDA"))
-        self.label_5.setText(_translate("MainWindow", "CONSUM (kW):"))
+        self.label_5.setText(_translate("MainWindow", "CONSUM (A):"))
         self.pushButton.setText(_translate("MainWindow", "Apagar no crític"))
         self.checkBox.setText(_translate("MainWindow", "Roig: Crític"))
         self.checkBox_2.setText(_translate("MainWindow", "Verd: No crític"))

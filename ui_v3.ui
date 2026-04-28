@@ -1104,7 +1104,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>CONSUM (kW):</string>
+      <string>CONSUM (A):</string>
      </property>
     </widget>
     <widget class="QPushButton" name="pushButton">

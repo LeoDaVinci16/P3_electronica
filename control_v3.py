@@ -4,7 +4,6 @@ from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import QTimer
 import pyqtgraph as pg
 from collections import deque
-
 from ui_v3 import Ui_MainWindow
 
 
@@ -25,11 +24,10 @@ class EnergyState:
         self.storage = 0.0
 
                 # ------------ DADES DE SOLAR ----------------
-        self.V_bus = 10.0          # Tensió inicial (V)
-        self.V_ref = 10.0          # Referència de 10V
-        self.C = 5.0               # Capacitat ajustada per a corrents de max 25.5A
-        self.dt = 0.02             # Pas de temps (20ms)
-        self.escala_I = 0.1        # Factor de conversió: Slider 255 -> 25.5 Amperis
+        self.V_bus = 10.0         # Tensió nominal (V)
+        self.C = 5.0              # Capacitat ajustada per a corrents de max 25.5A
+        self.dt = 0.02            # Pas de temps (20ms)
+        self.escala_I = 1         # Factor de conversió: Slider 255 -> 25.5 Amperis
         try:
             nom_fitxer = 'Timeseries_41.394_2.165_SA3_39deg_0deg_2023_2023.csv'
 
@@ -53,35 +51,18 @@ class EnergyState:
 # CONTROLLER
 # =========================================================
 class EnergyController:
-
     def compute(self, s):
-        i_pv = s.pv if s.pv_on else 0
-
+        # Determine potential PV current based on irradiance
+        i_pv_potential = s.pv if s.pv_on else 0
         loads = s.load
-        enabled = [0, 0, 0]
 
-        remaining = i_pv
+        # Voltage Regulation: Grid compensates to maintain 10V
+        V_ref = 10.0
+        error = V_ref - s.V_bus
+        i_grid_needed = error * 10.0  # Proportional control gain
+        i_grid = max(0, i_grid_needed)
 
-        # --- CRITICAL LOAD (red) ---
-        enabled[0] = loads[0]
-
-        if remaining >= loads[0]:
-            remaining -= loads[0]
-            i_grid = 0  
-        else:
-            # diesel fills the gap
-            i_grid = loads[0] - remaining
-            remaining = 0
-
-        # --- NON-CRITICAL ---
-        for i in (1, 2):
-            if remaining >= loads[i]:
-                enabled[i] = loads[i]
-                remaining -= loads[i]
-            else:
-                enabled[i] = 0  # load is shed
-
-        return i_pv, i_grid, enabled
+        return i_pv_potential, i_grid, loads[:]
 
 
 # =========================================================
@@ -95,6 +76,13 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.dt = 0.1
 
         self.setupUi(self)
+
+        # Adjust digit counts to avoid blank displays or precision loss (kW often needs more digits)
+        for lcd in [self.lcdNumber_6, self.lcdNumber_7, self.lcdNumber_9, self.lcdNumber_10,
+                    self.lcdNumber, self.lcdNumber_4, self.lcdNumber_12,
+                    self.lcdNumber_13, self.lcdNumber_14, self.lcdNumber_15]:
+            lcd.setDigitCount(6)
+        self.lcdNumber_8.setDigitCount(5) # Bus Voltage (e.g. 10.00)
 
         self.state = EnergyState()
         self.controller = EnergyController()
@@ -117,7 +105,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.curve = self.plot.plot()
 
         self.graph_win.show()
-
         # ---------------- TIMER ----------------
         self.timer = QTimer()
         self.timer.timeout.connect(self.step)
@@ -150,76 +137,90 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     # SIMULATION LOOP
     # =====================================================
     def step(self):
-        grid, served = self.controller.compute(self.state)
+        # 1. Update state from irradiance data before computing logic
+        irr = self.state.dades_irradiancia[self.index_hora]
+        self.state.pv = (irr / 1000.0) * 25.5  # Max 25.5A at peak irradiance
 
-        self.state.grid = grid
+        # 2. Run controller (returns i_pv, i_grid, enabled_loads)
+        i_pv_potential, i_grid, served = self.controller.compute(self.state)
+
+        self.state.grid = i_grid
+
+        # Update UI slider for grid support visual feedback
+        self.verticalSlider_2.blockSignals(True)
+        self.verticalSlider_2.setValue(int(i_grid / self.state.escala_I))
+        self.verticalSlider_2.blockSignals(False)
 
         effective_load = [
             self.state.load[i] if served[i] else 0
             for i in range(3)
         ]
 
-        # --- PV current from irradiance ---
-        irr = self.dades_irradiancia[self.index_hora]
-        i_pv = (irr / 1000) * 255 * self.state.escala_I
+        # Inverter Control: Throttle PV if voltage exceeds safe limits
+        i_pv = i_pv_potential
+        i_cons_total = sum(effective_load) * self.state.escala_I
+        if self.state.V_bus >= 14.5:
+            i_pv = min(i_pv_potential, i_cons_total)
 
-        # --- Grid current from controller ---
-        # (grid here is in "load units", convert to current)
-        i_grid = grid * self.state.escala_I
+        # --- Grid current ---
+        # i_grid is already in Amperes from controller
 
         # --- Load current (only served loads) ---
-        i_cons_total = sum(effective_load) * self.state.escala_I
+        p_cons_total_kw = (i_cons_total * self.state.V_bus) / 1000.0
 
         # --- Generation current ---
         i_gen_total = i_pv + i_grid
+        p_gen_total_kw = (i_gen_total * self.state.V_bus) / 1000.0
 
         # --- KCL ---
         i_net = i_gen_total - i_cons_total
 
         # --- Capacitor dynamics ---
         # dV = (I_net / C) * dt
-
-        self.state.V_bus += (i_net / self.C) * self.dt
-
-
-
-        # 1. Entrada PV Escalada (0 a 25.5 A)
-        irr = self.dades_irradiancia[self.index_hora]
-        self.corrent_pv = (irr / 1000) * 255 * self.escala_I
-        
-        ts = self.dades_temps[self.index_hora]
-        self.label_date.setText(f"Simulació 10V | {ts[6:8]}/{ts[4:6]} {ts[9:11]}:00")
-    
-
-        # 3. Dinàmica del Bus (KCL)
-        # Apliquem l'escala a les càrregues dels sliders
-
-
-        
-
-        
+        self.state.V_bus += (i_net / self.state.C) * self.state.dt
         # Límits de seguretat
         self.state.V_bus = max(0, min(self.state.V_bus, 15.0)) 
 
-        # 4. LCDs (Amb el valor real de corrent per a la generació i consum)
-        self.lcdNumber_6.display(irr)
+        # --- Protecció de sobre-tensió: Desconnexió solar si el bus està ple ---
+        if self.state.V_bus >= 14.98 and i_pv > i_cons_total:
+            if self.state.pv_on:
+                self.toggle_pv()
+        
+        # --- Auto-reconnect: If load is present and voltage is safe ---
+        if not self.state.pv_on and self.state.V_bus < 13.5 and i_cons_total > 0:
+            self.toggle_pv()
+
+        ts = self.state.dades_temps[self.index_hora]
+        self.label_date.setText(f"Simulació 10V | {ts[6:8]}/{ts[4:6]} {ts[9:11]}:00")
+
+        # 4. LCDs (All Power values shown in kW)
+        p_solar_kw = (i_pv * self.state.V_bus) / 1000.0
+        p_grid_kw = (i_grid * self.state.V_bus) / 1000.0
+
+        self.lcdNumber_6.display(float(f"{p_solar_kw:.3f}"))
+        self.lcdNumber_7.display(float(f"{p_grid_kw:.3f}"))
         self.lcdNumber_8.display(float(f"{self.state.V_bus:.2f}"))
-        self.lcdNumber_9.display(float(f"{i_gen_total:.1f}"))
-        self.lcdNumber_10.display(float(f"{i_cons_total:.1f}"))
+        self.lcdNumber_9.display(float(f"{p_gen_total_kw:.3f}"))
+        self.lcdNumber_10.display(float(f"{p_cons_total_kw:.3f}"))
 
-        self.index_hora = (self.index_hora + 1) % self.total_hores
+        # Display current in Amperes for individual loads (1, 2, 3)
+        self.lcdNumber_1.display(float(f"{effective_load[0] * self.state.escala_I:.2f}")) 
+        self.lcdNumber_2.display(float(f"{effective_load[1] * self.state.escala_I:.2f}"))
+        self.lcdNumber_3.display(float(f"{effective_load[2] * self.state.escala_I:.2f}"))
 
-
-        # ---------------- UI ----------------
-        #self.lcdNumber_8.display(balance)
-        #self.lcdNumber_7.display(grid)
-        #self.lcdNumber_9.display(gen)
-        #self.lcdNumber_10.display(load)
-        #self.lcdNumber_6.display(pv)
-
-        self.lcdNumber_1.display(effective_load[0]) 
-        self.lcdNumber_2.display(effective_load[1])
-        self.lcdNumber_3.display(effective_load[2])
+        # --- Schematic Displays (Esquema) ---
+        self.lcdNumber.display(float(f"{p_solar_kw:.3f}"))        # Solar power kW
+        self.lcdNumber_4.display(float(f"{p_grid_kw:.3f}"))    # Grid power kW
+        self.lcdNumber_5.display(float(f"{self.state.V_bus:.2f}")) # Bus Voltage
+        
+        # SoC calculation (0-15V range mapped to 0-100%)
+        soc = (self.state.V_bus / 15.0) * 100
+        self.lcdNumber_11.display(float(f"{soc:.1f}"))
+        self.lcdNumber_12.display(float(f"{(i_net * self.state.V_bus / 1000.0):.3f}"))    # Condenser power kW
+        
+        self.lcdNumber_13.display(float(f"{effective_load[0] * self.state.escala_I:.1f}")) # Load 1 A
+        self.lcdNumber_14.display(float(f"{effective_load[1] * self.state.escala_I:.1f}")) # Load 2 A
+        self.lcdNumber_15.display(float(f"{effective_load[2] * self.state.escala_I:.1f}")) # Load 3 A
 
         self.checkBox.setChecked(self.state.load[0] > 0)
         self.checkBox_3.setChecked(self.state.load[1] > 0)
@@ -229,7 +230,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.checkBox_8.setChecked(self.state.load[1] > 0)
         self.checkBox_9.setChecked(self.state.load[2] > 0)
 
-        self.lcdNumber_6.display(pv)
+        self.index_hora = (self.index_hora + 1) % self.state.total_hores
 
         # ---------------- GRAPH ----------------
         self.history.append(self.state.V_bus)
