@@ -87,7 +87,12 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.state = EnergyState()
         self.controller = EnergyController()
 
-        self.history = deque(maxlen=200)
+        # History deques for plotting
+        self.hist_vbus = deque(maxlen=200)
+        self.hist_soc = deque(maxlen=200)
+        self.hist_solar = deque(maxlen=200)
+        self.hist_grid = deque(maxlen=200)
+        self.hist_cons = deque(maxlen=200)
 
         QtCore.QTimer.singleShot(0, self.step)
 
@@ -98,11 +103,31 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.xarxa_conectada = False
 
         # ---------------- GRAPH WINDOW ----------------
-        self.graph_win = pg.GraphicsLayoutWidget(title="Balanç Energètic")
-        self.graph_win.resize(800, 400)
+        self.graph_win = pg.GraphicsLayoutWidget(title="Monitorització de la Micro-xarxa")
+        self.graph_win.resize(1000, 800)
 
-        self.plot = self.graph_win.addPlot(title="Balance")
-        self.curve = self.plot.plot()
+        # Plot 1: Voltage
+        self.p1 = self.graph_win.addPlot(title="Tensió del Bus (V)")
+        self.p1.showGrid(x=True, y=True)
+        self.curve_vbus = self.p1.plot(pen='y')
+        
+        self.graph_win.nextRow()
+        
+        # Plot 2: SoC
+        self.p2 = self.graph_win.addPlot(title="Estat de Càrrega SoC (%)")
+        self.p2.showGrid(x=True, y=True)
+        self.p2.setYRange(0, 100)
+        self.curve_soc = self.p2.plot(pen='g')
+        
+        self.graph_win.nextRow()
+        
+        # Plot 3: Powers (kW)
+        self.p3 = self.graph_win.addPlot(title="Potències (kW)")
+        self.p3.showGrid(x=True, y=True)
+        self.p3.addLegend()
+        self.curve_solar = self.p3.plot(pen=pg.mkPen('orange', width=2), name='Solar')
+        self.curve_grid = self.p3.plot(pen=pg.mkPen('cyan', width=2), name='Xarxa')
+        self.curve_cons = self.p3.plot(pen=pg.mkPen('red', width=2), name='Consum')
 
         self.graph_win.show()
         # ---------------- TIMER ----------------
@@ -233,8 +258,17 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.index_hora = (self.index_hora + 1) % self.state.total_hores
 
         # ---------------- GRAPH ----------------
-        self.history.append(self.state.V_bus)
-        self.curve.setData(list(self.history))
+        self.hist_vbus.append(self.state.V_bus)
+        self.hist_soc.append(soc)
+        self.hist_solar.append(p_solar_kw)
+        self.hist_grid.append(p_grid_kw)
+        self.hist_cons.append(p_cons_total_kw)
+
+        self.curve_vbus.setData(list(self.hist_vbus))
+        self.curve_soc.setData(list(self.hist_soc))
+        self.curve_solar.setData(list(self.hist_solar))
+        self.curve_grid.setData(list(self.hist_grid))
+        self.curve_cons.setData(list(self.hist_cons))
 
         # ------------- set led slider to 0 if it breaks ----------------
         sliders = [
