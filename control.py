@@ -1,310 +1,353 @@
-"""
-F. Casellas (GEEE: dic 2022)
-
-Los datos y el control con ESP32 por puerto USB uControl_XX.py en run
-Mejor poner el programa XXX en el boot
-
-Referencias:
-    PyQt 5 >>   https://doc.qt.io/
-                https://www.riverbankcomputing.com/static/Docs/PyQt5/
-                https://www.pyqtgraph.org/
-                https://pyqtgraph.readthedocs.io/en/latest/
-    Artículos >>https://pythonpyqt.com/contents/
-    Ejemplos >> https://pythonpyqt.com/qtimer/
-                https://www.laboratoriogluon.com/pyqtgraph-graficas-tiempo-real-con-python/
-                https://web.archive.org/web/20080412230517/http://bulma.net/impresion.phtml?nIdNoticia=2336
-
- Detalles del proceso en:
-    https://unipython.com/pyqt5-interfaces-graficas-con-python/
-    https://medium.com/@hektorprofe/primeros-pasos-en-pyqt-5-y-qt-designer-programas-gr%C3%A1ficos-con-python-6161fba46060    
-1.- ejecutar designer desde consola o desde acceso directo
-2.- generar fichero Python en carpeta de trabajo con consola Anaconda-Navigator >> pyuic5 -x pru.ui -o ventana_ui.py
-3.- programar en Python los métodos para cargar las librerías
-4.- cargar la interfaz UI: etiquetas, conexiones y funcionalidades
-5.- programar el resto de la aplicación
-"""
+# -*- coding: utf-8 -*-
+import pandas as pd
 from PyQt5 import QtWidgets, QtCore, QtGui
-#from pyqtgraph.Qt import QtGui, QtCore
+from PyQt5.QtCore import QTimer
 import pyqtgraph as pg
-import serial, time, random, sys
+from collections import deque
+from ui import Ui_MainWindow
 
+# =========================================================
+# MODEL
+# =========================================================
+class EnergyState:
+    def __init__(self):
+        self.load = [0, 0, 0]
+        self.load_enabled = [True, True, True]
 
-USE_SERIAL = False
+        self.pv = 0
+        self.pv_on = True
 
-# Aqui comienzan los métodos del UI
-from ui_v1 import *  # importo todo lo declarado en la UI
-from PyQt5.QtCore import QTimer # importo temporizador
+        self.grid_base = 0
+        self.grid = 0
 
+        self.storage = 0.0
 
-class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow): # Constructor de mi ventana
-    def __init__(self, *args, **kwargs):
-        QtWidgets.QMainWindow.__init__(self, *args, **kwargs)
-        self.setupUi(self) 
-          
-        # Variables del sistema energètic (consolidated)
-
-        self.solar = 0
-        self.diesel = 0
-
-        self.red = 0
-        self.blue = 0
-        self.green = 0
-
-        # Graph data
-        self.dataN = []
-        self.dataY = []
-        self.lastN = 0
-
-        # inicio el temporizador o evento temporal y cargo la función a ejecutar MUESTREO
-        self.timer=QTimer()
-        self.timer.timeout.connect(self.muestreo)
-        self.timer.start(100)   # 100ms interval
+                # ------------ DADES DE SOLAR ----------------
+        self.V_bus = 10.0         # Tensió nominal (V)
+        self.C = 50.0             # Capacitat ajustada per a corrents de max 25.5A
+        self.dt = 1              # Pas de temps (en hores). 0.002h = 7.2s de simulació per pas.        
+        self.speed = 50 # Velocitat de la simulació
+                # To make simulation go faster, decrease this; to slow it down, increase it.
+        self.escala_I = 0.1       # Factor de conversió: Slider 100 -> 10 Amperis
         
-        # Editar los valores iniciales de las etiquetas que hay en la UI
-        self.label.setText("Gestió Energètica: Balanç (Gen - Consum)")     
-        self.pushButton_1.setText("Boto Extra")
-        self.pushButton_2.setText("Generador: OFF")   
-        self.generador_activat = False
-        
-        # Crear las conexiones de los eventos botones con las funcionalidades
-        self.pushButton_1.clicked.connect(self.botonSerie)   
-        self.pushButton_2.clicked.connect(self.botonON)
-        
-        # Connexions dels sliders de CONSUM (Càrregues) als respectius LCDs i funcions
-        self.horizontalSlider_1.valueChanged.connect(self.leeCarga1)
-        self.horizontalSlider_2.valueChanged.connect(self.leeCarga2)
-        self.horizontalSlider_3.valueChanged.connect(self.leeCarga3)
+        try:
+            nom_fitxer = 'irradiancia.csv'
 
-        # Connexions dels sliders de GENERACIÓ als respectius LCDs i funcions
-        self.verticalSlider_1.valueChanged.connect(self.leePV)
-        self.verticalSlider_2.valueChanged.connect(self.leeDiesel)
-
-        #self.grafica = Canvas_grafica()
-        #self.ui.grafica.addWidget(self.grafica)
-        
-
-           
-    # Crear nuevas funcionalidades 
-    """ def muestreo(self):   # Mide periodicamente la tension
-        ser.write(b'V\r')    # solicita el dato siguiente
-        global curva, dataN, dataY, lastN, nuevoDato
-        
-        while(ser.in_waiting > 1):
-            # Lee dato del buffer hasta que encuentra un CR '\n'
-            texto = ser.readline()
-            try:    # cuidado aparece texto sin numero y genera error
-                valor=float(texto)  # la conversion problematica
-            except:
-                print('ERROR número:', texto)
-                self.label.setText(texto.decode('Ascii'))# se pasa EVENT del SERIE a la etiqueta
-            else:
-                self.lcdNumber_8.display(valor)   # se pasa EVENT del SERIE al LCD
-                #Agregamos los datos al array
-                dataY.append(valor)
-                dataN.append(lastN)
-                lastN = lastN + 1
-
-                # Limitamos a mostrar solo 2000 muestras
-                if len(dataN) > 2000:
-                    dataY = dataY[1:-1]
-                    dataN = dataN[1:-1]
-
-                #Actualizamos los datos y refrescamos la gráfica.
-                curva.setData(dataN, dataY)     # eje horizontal, eje vertical
-                QtGui.QApplication.processEvents() """   
-
-    def muestreo(self):
-        global curva, dataN, dataY, lastN
-
-        if USE_SERIAL and ser:
-            try:
-                ser.write(b'V\r')
-                texto = ser.readline()
-
-                try:
-                    valor = float(texto)
-                except:
-                    return
-
-            except:
-                return
-
-        else:
-            # SIMULATION (fake sensor)
-            # 1. Calculem el consum total
-            consum_total = self.carga_1 + self.carga_2 + self.carga_3
+            df = pd.read_csv(nom_fitxer, skiprows=8, skipfooter=10, engine='python')
+            df['time'] = pd.to_datetime(df['time'], format='%Y%m%d:%H%M')
             
-            # 2. Generació actual pre-càlcul
-            generacio_diesel_actual = self.energia_diesel if self.generador_activat else 0
-            generacio_total = self.energia_pv + generacio_diesel_actual
+            # Filtre de setmana (168 hores)
+            df_setmana = df.iloc[0:8760] 
             
-            # 3. RESTRICCIÓ: La Càrrega 1 sempre ha d'estar coberta
-            if generacio_total < self.carga_1:
-                # Calculem l'energia que falta
-                falta = self.carga_1 - generacio_total
-                
-                # Si el generador està apagat, l'encenem automàticament
-                if not self.generador_activat:
-                    self.generador_activat = True
-                    self.pushButton_2.setText("Generador: ON")
-                    
-                # Calculem el nou valor on ha d'estar el slider del generador
-                nou_valor_diesel = self.energia_diesel + falta
-                
-                # Movem el slider de la interfície AUTOMÀTICAMENT
-                # Això dispararà la funció 'leeDiesel' per si sol i ens actualitzarà els LCDs
-                self.verticalSlider_2.setValue(nou_valor_diesel)
-                
-                # Com que hem canviat el dièsel en aquest mateix cicle, actualitzem la generació
-                generacio_total = self.energia_pv + self.energia_diesel
-            
-            # 4. El balanç net (Generació - Consum) totalment net, sense soroll
-            balanc_net = generacio_total - consum_total
-            
-            self.lcdNumber_8.display(balanc_net)   # Mostrem el balanç al LCD gran
+            self.dades_irradiancia = df_setmana['G(i)'].values
+            self.dades_temps = df_setmana['time'].dt.strftime('%Y%m%d:%H%M').values
+            self.total_hores = len(self.dades_irradiancia)
+            print(f"✅ Simulació 10V / 25A preparada: {self.total_hores} hores.")
+        except Exception as e:
+            print(f"❌ Error dades: {e}")
+            self.dades_irradiancia = [0]*168
+            self.dades_temps = ["00000000:0000"]*168
 
-        self.lcdNumber_8.display(valor)
 
-        dataY.append(valor)
-        dataN.append(lastN)
-        lastN += 1
-
-        if len(dataN) > 2000:
-            dataN = dataN[1:]
-            dataY = dataY[1:]
-
-        curva.setData(dataN, dataY)
-                               
-    def leeCarga1(self,event):
-        self.lcdNumber_1.display(event)   # se pasa EVENT del SLIDER al LCD
-        if USE_SERIAL and ser:
-            ser.write(bytes('A'+str(event)+'\r','ascii'))
-        else:
-            print("Red", event)
-            self.red = event
-            self.update_consum()
-    def leeCarga2(self,event):
-        self.lcdNumber_2.display(event)   # se pasa EVENT del SLIDER al LCD
-        if USE_SERIAL and ser:
-            ser.write(bytes('A'+str(event)+'\r','ascii'))
-        else:
-            print("Blue", event)
-            self.blue = event
-            self.update_consum()
-    def leeCarga3(self,event):
-        self.lcdNumber_3.display(event)   # se pasa EVENT del SLIDER al LCD
-        if USE_SERIAL and ser:
-            ser.write(bytes('A'+str(event)+'\r','ascii'))
-        else:
-            print("Green", event)
-            self.green = event
-            self.update_consum()
-
-    def leePV(self,event):
-        self.lcdNumber_6.display(event)   # se pasa EVENT del SLIDER al LCD
-        #print(event)   # Muestra el dato EVENT en la pantalla de la consola 
-        if USE_SERIAL and ser:
-            ser.write(bytes('A'+str(event)+'\r','ascii'))
-        else:
-            print("Solar", event)
-            self.solar = event
-            self.update_power()
-    def leeDiesel(self,event):
-        self.lcdNumber_7.display(event)     # se pasa EVENT del SLIDER al LCD
-        #print(event)   # Muestra el dato EVENT en la pantalla de la consola 
-        if USE_SERIAL and ser:
-            ser.write(bytes('A'+str(event)+'\r','ascii'))
-        else:
-            print("Diesel", event)
-            self.diesel = event
-            self.update_power()
-
-    def update_power(self):
-        powerIN = self.solar + self.diesel
-        self.lcdNumber_9.display(powerIN)     # se pasa EVENT del SLIDER al LCD
-        print("Power: ", powerIN)
-
-    def update_consum(self):
-        powerOUT = self.red+self.blue+self.green
-        self.lcdNumber_10.display(powerOUT)
-        print("Consum: ", powerOUT)
-
-    def botonON(self):       
-        global estado 
-        if (estado == False):
-            self.pushButton_2.setText("Generador:on") 
-            ser.write(b'on\r')
-            estado = True
-        else:
-            self.pushButton_2.setText("Generador:off") 
-            ser.write(b'off\r')
-            estado = False
-        #print(estado)           
+# =========================================================
+# CONTROLLER
+# =========================================================
+class EnergyController:
+    def compute(self, s):
+        # Determine potential PV current based on irradiance
+        i_pv_potential = s.pv if s.pv_on else 0
+        load_amps = [l * s.escala_I for l in s.load]
         
-    def botonSerie(self):       
-        #ser.write(b'XXXX\r')
-        #ser.write(b'V\r')
-        print('Botó per defecte premut.')
-  
+        # 1. Load Shedding Logic
+        # Load 0 (Red) is critical. Loads 1 & 2 are shed if V_bus drops
+        # indicating PV + Condenser cannot satisfy the total demand.
+        served = [True, False, False]
         
+        # If the bus is well-charged (>10.5V), use stored energy for all loads
+        if s.V_bus > 10.5:
+            served = [True, True, True]
+        # Otherwise, if voltage is healthy, allow them only if Solar can sustain them
+        elif s.V_bus > 10.2:
+            if i_pv_potential >= (load_amps[0] + load_amps[1] + load_amps[2]):
+                served = [True, True, True]
+            elif i_pv_potential >= (load_amps[0] + load_amps[1]):
+                served = [True, True, False]
+
+        # 2. Grid Compensation (Only for Red Load)
+        # Grid kicks in only if V_bus < 10.0V. Since non-criticals shed at 10.1V,
+        # the grid effectively only supports Load 0.
+        i_grid = max(0, (10.0 - s.V_bus) * 15.0) if s.V_bus < 10.0 else 0
+
+        return i_pv_potential, i_grid, served
+
+
+# =========================================================
+# MAIN WINDOW
+# =========================================================
+class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
+    def __init__(self):
+        super().__init__()
+        self.state = EnergyState()
+        # ----------------- SIMULATION TIME --------------------------        
+        self.simulation_time = 0.0        
+        self.dt = self.state.dt
+
+        self.setupUi(self)
+
+        for lcd in [self.lcdNumber_6, self.lcdNumber_7, self.lcdNumber_9, self.lcdNumber_10,
+                    self.lcdNumber_1, self.lcdNumber_2, self.lcdNumber_3,
+                    self.lcdNumber, self.lcdNumber_4, self.lcdNumber_12,
+                    self.lcdNumber_13, self.lcdNumber_14, self.lcdNumber_15]:
+            lcd.setDigitCount(5)
+
+        from PyQt5 import QtGui
+
+        def set_lcd_color(lcd, color):
+            pal = lcd.palette()
+            pal.setColor(QtGui.QPalette.WindowText, QtGui.QColor(color))
+            lcd.setPalette(pal)
+            lcd.setStyleSheet("")
+            lcd.setSegmentStyle(QtWidgets.QLCDNumber.Flat)
+
+        set_lcd_color(self.lcdNumber_1, "red")
+        set_lcd_color(self.lcdNumber_2, "blue")
+        set_lcd_color(self.lcdNumber_3, "green")
+
+        self.lcdNumber_8.setDigitCount(5) # Bus Voltage (e.g. 10.00)
+
+        self.controller = EnergyController()
+
+        # History deques for plotting
+        self.hist_vbus = deque(maxlen=500)
+        self.hist_soc = deque(maxlen=200)
+        self.hist_solar = deque(maxlen=200)
+        self.hist_grid = deque(maxlen=200)
+        self.hist_cons = deque(maxlen=200)
+
+        QtCore.QTimer.singleShot(0, self.step)
+
+        self.index_hora = 0 
+        self.corrent_pv = 0
+        self.corrent_xarxa = 0
+        self.carga_1 = self.carga_2 = self.carga_3 = 0
+        self.xarxa_conectada = False
+
+        # ---------------- GRAPH WINDOW ----------------
+        self.graph_win = pg.GraphicsLayoutWidget(title="Monitorització de la Micro-xarxa")
+        self.graph_win.resize(1000, 800)
+
+        # Plot 1: Voltage
+        self.p1 = self.graph_win.addPlot(title="Tensió del Bus (V)")
+        self.p1.showGrid(x=True, y=True)
+        self.curve_vbus = self.p1.plot(pen='y')
         
-# Aqui comienza el programa de control
-# Abrimos un puerto serie
-#ser = serial.Serial('/dev/ttyUSB0', 115200)
-#ser = serial.Serial('/dev/ttyACM0', 115200)
-#ser = serial.Serial('com3', 115200)
+        self.graph_win.nextRow()
+        
+        # Plot 2: SoC
+        self.p2 = self.graph_win.addPlot(title="Estat de Càrrega SoC (%)")
+        self.p2.showGrid(x=True, y=True)
+        self.p2.setYRange(0, 100)
+        self.curve_soc = self.p2.plot(pen='g')
+        
+        self.graph_win.nextRow()
+        
+        # Plot 3: Powers (W)
+        self.p3 = self.graph_win.addPlot(title="Potències (W)")
+        self.p3.showGrid(x=True, y=True)
+        self.p3.addLegend()
+        self.curve_solar = self.p3.plot(pen=pg.mkPen('orange', width=2), name='Solar')
+        self.curve_grid = self.p3.plot(pen=pg.mkPen('cyan', width=2), name='Xarxa')
+        self.curve_cons = self.p3.plot(pen=pg.mkPen('red', width=2), name='Consum')
 
-ser = None
+        self.graph_win.show()
+        # ---------------- TIMER ----------------
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.step)
 
-if USE_SERIAL:
-    ser = serial.Serial('COM3', 115200)
+        # Real-time interval between steps (ms). 
+        self.timer.start(self.state.speed) 
 
-linea =b'off\r'       # El texto viaja en bytes, ejemplo de formato y de paso defino la variable. 
-estado = False
+        # ---------------- INPUTS ----------------
+        self.horizontalSlider_1.valueChanged.connect(lambda v: self.set_load(0, v))
+        self.horizontalSlider_2.valueChanged.connect(lambda v: self.set_load(1, v))
+        self.horizontalSlider_3.valueChanged.connect(lambda v: self.set_load(2, v))
 
-# Pantalla auxiliar  
-app = QtWidgets.QApplication([])
-win = pg.GraphicsLayoutWidget(title="Gráfica en tiempo real")     #nombre de la ventana
-p = win.addPlot(title="DDP en V")                #titulo de la grafica
+        self.verticalSlider_2.valueChanged.connect(self.set_grid)
 
-curva = p.plot(pen='y')
-# p.setRange(yRange=[0, 3.2])
+        self.pushButton_3.clicked.connect(self.closeAll)
 
-dataN = [] # Vector de muestras
-dataY = []  # Vector de valores
-lastN = 0
-num =0
-nuevoDato = 0 
+    # ----------------------- LED INDICATORS --------------
+        self.state.load = [0, 0, 0]
+        self.state.pv = 0
+        self.state.grid = 0
+
+        self.horizontalSlider_1.setValue(0)
+        self.horizontalSlider_2.setValue(0)
+        self.horizontalSlider_3.setValue(0)
+
+        self.verticalSlider_2.setValue(0)
+
+    # =====================================================
+    # SIMULATION LOOP
+    # =====================================================
+    def step(self):
+        # 1. Update state from irradiance data before computing logic
+        # Synchronize: index_hora only increments when simulation_time crosses an hour boundary
+        self.index_hora = int(self.simulation_time) % self.state.total_hores
+        
+        irr = self.state.dades_irradiancia[self.index_hora]
+        self.state.pv = (irr / 1000.0) * 25.5  # Max 25.5A at peak irradiance
+
+        # 2. Run controller (returns i_pv, i_grid, enabled_loads)
+        i_pv_potential, i_grid, served = self.controller.compute(self.state)
+
+        self.state.grid = i_grid
+
+        # Update UI slider for grid support visual feedback
+        self.verticalSlider_2.blockSignals(True)
+        self.verticalSlider_2.setValue(int(i_grid / self.state.escala_I))
+        self.verticalSlider_2.blockSignals(False)
+
+        effective_load = [
+            self.state.load[i] if served[i] else 0
+            for i in range(3)
+        ]
+
+        # Inverter Control: Throttle PV if voltage exceeds safe limits
+        i_pv = i_pv_potential
+        i_cons_total = sum(effective_load) * self.state.escala_I
+        if self.state.V_bus >= 14.5:
+            i_pv = min(i_pv_potential, i_cons_total)
+
+        # --- Grid current ---
+        # i_grid is already in Amperes from controller
+
+        # --- Load current (only served loads) ---
+        p_cons_total_w = (i_cons_total * self.state.V_bus)
+
+        # --- Generation current ---
+        i_gen_total = i_pv + i_grid
+        p_gen_total_w = (i_gen_total * self.state.V_bus)
+
+        # --- KCL ---
+        i_net = i_gen_total - i_cons_total
+
+        # --- Capacitor dynamics ---
+        # dV = (I_net / C) * dt
+        self.state.V_bus += (i_net / self.state.C) * self.state.dt
+        # Límits de seguretat
+        self.state.V_bus = max(0, min(self.state.V_bus, 15.0)) 
+
+        # --- Protecció de sobre-tensió: Desconnexió solar si el bus està ple ---
+        if self.state.V_bus >= 14.98 and i_pv > i_cons_total:
+            if self.state.pv_on:
+                self.toggle_pv()
+        
+        # --- Auto-reconnect: If load is present and voltage is safe ---
+        if not self.state.pv_on and self.state.V_bus < 13.5 and i_cons_total > 0:
+            self.toggle_pv()
+
+        ts = self.state.dades_temps[self.index_hora]
+        self.label_date.setText(f"Durada total: {self.simulation_time:.1f} h \n\nData: {ts[6:8]}/{ts[4:6]}/2023 {ts[9:11]}:00 h")
+
+        # 4. LCDs (All Power values shown in W)
+        p_solar_w = (i_pv * self.state.V_bus)
+        p_grid_w = (i_grid * self.state.V_bus)  
+
+        self.lcdNumber_6.display(float(f"{p_solar_w:.1f}"))
+        self.lcdNumber_7.display(float(f"{p_grid_w:.1f}"))
+        self.lcdNumber_8.display(float(f"{self.state.V_bus:.2f}"))
+        self.lcdNumber_9.display(float(f"{p_gen_total_w:.1f}"))
+        self.lcdNumber_10.display(float(f"{p_cons_total_w:.1f}"))
+        self.lcdNumber_16.display(float(f"{(i_net * self.state.V_bus):.1f}"))    # Condenser power W
+
+        # Display current in Amperes for individual loads (1, 2, 3)
+        self.lcdNumber_1.display(effective_load[0] * self.state.escala_I) 
+        self.lcdNumber_2.display(effective_load[1] * self.state.escala_I)
+        self.lcdNumber_3.display(effective_load[2] * self.state.escala_I)
+
+        # --- Schematic Displays (Esquema) ---
+        self.lcdNumber.display(float(f"{p_solar_w:.1f}"))        # Solar power W
+        self.lcdNumber_4.display(float(f"{p_grid_w:.1f}"))    # Grid power W
+        self.lcdNumber_5.display(float(f"{self.state.V_bus:.2f}")) # Bus Voltage
+        
+        # SoC calculation (0-15V range mapped to 0-100%)
+        soc = (self.state.V_bus / 15.0) * 100
+        self.lcdNumber_11.display(float(f"{soc:.1f}"))
+        self.lcdNumber_12.display(float(f"{(i_net):.1f}"))    # Condenser current
+        
+        self.lcdNumber_13.display(float(f"{effective_load[0] * self.state.escala_I:.1f}")) # Load 1 A
+        self.lcdNumber_14.display(float(f"{effective_load[1] * self.state.escala_I:.1f}")) # Load 2 A
+        self.lcdNumber_15.display(float(f"{effective_load[2] * self.state.escala_I:.1f}")) # Load 3 A
+
+        self.checkBox.setChecked(self.state.load[0] > 0)
+        self.checkBox_3.setChecked(self.state.load[1] > 0)
+        self.checkBox_2.setChecked(self.state.load[2] > 0)
+
+        self.checkBox_7.setChecked(self.state.load[0] > 0)
+        self.checkBox_8.setChecked(self.state.load[1] > 0)
+        self.checkBox_9.setChecked(self.state.load[2] > 0)
+
+        # ---------------- GRAPH ----------------
+        self.hist_vbus.append(self.state.V_bus)
+        self.hist_soc.append(soc)
+        self.hist_solar.append(p_solar_w)
+        self.hist_grid.append(p_grid_w)
+        self.hist_cons.append(p_cons_total_w)
+
+        self.curve_vbus.setData(list(self.hist_vbus))
+        self.curve_soc.setData(list(self.hist_soc))
+        self.curve_solar.setData(list(self.hist_solar))
+        self.curve_grid.setData(list(self.hist_grid))
+        self.curve_cons.setData(list(self.hist_cons))
+
+        # ------------- set led slider to 0 if it breaks ----------------
+        sliders = [
+            self.horizontalSlider_1,
+            self.horizontalSlider_2,
+            self.horizontalSlider_3]
+
+        for i in (1, 2):
+            if not served[i] and sliders[i].value() != 0:
+                sliders[i].setValue(0)
+
+        # time:
+        self.simulation_time += self.dt
+    # =====================================================
+    # INPUT HANDLERS
+    # =====================================================
+    def set_load(self, i, value):
+        self.state.load[i] = value
+
+    def set_grid(self, value):
+        self.state.grid_base = value
+
+    # solar toggle WITH SLIDER RESET
+    def toggle_pv(self):
+        self.state.pv_on = not self.state.pv_on
+
+        if not self.state.pv_on:
+            self.state.pv = 0
+            print("S'ha desconectat la FV")
+        else:
+            print("S'ha connectat la FV")
+
+    # =====================================================
+    # CLOSE BOTH WINDOWS
+    # =====================================================
+    def closeAll(self):
+        self.graph_win.close()
+        self.close()
+        print("S'ha apagat la aplicació")
 
 
-win.show()
+# =========================================================
+# MAIN
+# =========================================================
+if __name__ == "__main__":
+    import sys
 
-# Aqui se abre la UI
-if __name__ == "__main__":  
-    app = QtWidgets.QApplication([])
-    window = MainWindow()
-    window.show()
-    app.exec_()
-
-
-# test signal (IMPORTANT)
-curva.setData([0, 1, 2, 3], [0, 1, 0, 1])
-
-sys.exit(app.exec_())
-
-# Posproceso: cierra el LED y el puerto serie
-ser.write(b'off\r')
-time.sleep(0.2)
-ser.write(b'A0\r')
-time.sleep(0.2)
-
-# No sabes la cantidad de bytes recibidos, utilizo tabulador CR y/o LF.
-respuesta = ser.readline() 
-texto = respuesta.decode('utf-8')     # Transforma los bytes en string
-print('>>', texto)
-print('- cierre -')
-ser.close()
-  
-
-
-
+    app = QtWidgets.QApplication(sys.argv)
+    w = MainWindow()
+    w.show()
+    sys.exit(app.exec_())
