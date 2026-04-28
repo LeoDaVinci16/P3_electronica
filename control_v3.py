@@ -27,7 +27,7 @@ class EnergyState:
         self.V_bus = 10.0         # Tensió nominal (V)
         self.C = 5.0              # Capacitat ajustada per a corrents de max 25.5A
         self.dt = 0.02            # Pas de temps (20ms)
-        self.escala_I = 1         # Factor de conversió: Slider 255 -> 25.5 Amperis
+        self.escala_I = 0.1         # Factor de conversió: Slider 255 -> 25.5 Amperis
         try:
             nom_fitxer = 'Timeseries_41.394_2.165_SA3_39deg_0deg_2023_2023.csv'
 
@@ -54,15 +54,29 @@ class EnergyController:
     def compute(self, s):
         # Determine potential PV current based on irradiance
         i_pv_potential = s.pv if s.pv_on else 0
-        loads = s.load
+        load_amps = [l * s.escala_I for l in s.load]
+        
+        # 1. Load Shedding Logic
+        # Load 0 (Red) is critical. Loads 1 & 2 are shed if V_bus drops
+        # indicating PV + Condenser cannot satisfy the total demand.
+        served = [True, False, False]
+        
+        # If the bus is well-charged (>10.5V), use stored energy for all loads
+        if s.V_bus > 10.5:
+            served = [True, True, True]
+        # Otherwise, if voltage is healthy, allow them only if Solar can sustain them
+        elif s.V_bus > 10.2:
+            if i_pv_potential >= (load_amps[0] + load_amps[1] + load_amps[2]):
+                served = [True, True, True]
+            elif i_pv_potential >= (load_amps[0] + load_amps[1]):
+                served = [True, True, False]
 
-        # Voltage Regulation: Grid compensates to maintain 10V
-        V_ref = 10.0
-        error = V_ref - s.V_bus
-        i_grid_needed = error * 10.0  # Proportional control gain
-        i_grid = max(0, i_grid_needed)
+        # 2. Grid Compensation (Only for Red Load)
+        # Grid kicks in only if V_bus < 10.0V. Since non-criticals shed at 10.1V,
+        # the grid effectively only supports Load 0.
+        i_grid = max(0, (10.0 - s.V_bus) * 15.0) if s.V_bus < 10.0 else 0
 
-        return i_pv_potential, i_grid, loads[:]
+        return i_pv_potential, i_grid, served
 
 
 # =========================================================
