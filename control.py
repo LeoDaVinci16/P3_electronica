@@ -22,13 +22,14 @@ class EnergyState:
 
         self.storage = 0.0
 
-                # ------------ DADES DE SOLAR ----------------
-        self.V_bus = 10.0         # Tensió nominal (V)
-        self.C = 50.0             # Capacitat ajustada per a corrents de max 25.5A
-        self.dt = 1              # Pas de temps (en hores). 0.002h = 7.2s de simulació per pas.        
-        self.speed = 50 # Velocitat de la simulació
-                # To make simulation go faster, decrease this; to slow it down, increase it.
-        self.escala_I = 0.1       # Factor de conversió: Slider 100 -> 10 Amperis
+                # ------------ DADES ----------------
+        # Condensador pot ser de 12 mF, 2.2 i 24 (crec)
+        self.V_bus = 10.0       # Tensió nominal (V)
+        self.C = 24             # Capacitat ajustada per a corrents de max 25.5A
+        self.dt = 1             # Pas de temps (en hores). 0.002h = 7.2s de simulació per pas.        
+        self.speed = 100        # Velocitat de la simulació
+                                # To make simulation go faster, decrease this; to slow it down, increase it.
+        self.escala_I = 0.1     # Factor de conversió: Slider 100 -> 10 Amperis
         
         try:
             nom_fitxer = 'irradiancia.csv'
@@ -64,10 +65,10 @@ class EnergyController:
         served = [True, False, False]
         
         # If the bus is well-charged (>10.5V), use stored energy for all loads
-        if s.V_bus > 10.5:
+        if s.V_bus > 5.5:
             served = [True, True, True]
-        # Otherwise, if voltage is healthy, allow them only if Solar can sustain them
-        elif s.V_bus > 10.2:
+        # Otherwise, if voltage is healthy, allow them only if Solar can sustain them (>10.2)
+        elif s.V_bus > 5.2:
             if i_pv_potential >= (load_amps[0] + load_amps[1] + load_amps[2]):
                 served = [True, True, True]
             elif i_pv_potential >= (load_amps[0] + load_amps[1]):
@@ -76,7 +77,7 @@ class EnergyController:
         # 2. Grid Compensation (Only for Red Load)
         # Grid kicks in only if V_bus < 10.0V. Since non-criticals shed at 10.1V,
         # the grid effectively only supports Load 0.
-        i_grid = max(0, (10.0 - s.V_bus) * 15.0) if s.V_bus < 10.0 else 0
+        i_grid = max(0, (5.0 - s.V_bus) * 15.0) if s.V_bus < 5.0 else 0
 
         return i_pv_potential, i_grid, served
 
