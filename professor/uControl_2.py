@@ -6,6 +6,7 @@ import sys
 # -----------------------
 dac_1 = DAC(Pin(25))
 dac_2 = DAC(Pin(26))
+adc_1 = DAC(Pin(34))
 
 i_1 = 0
 i_2 = 0
@@ -33,6 +34,9 @@ while True:
             if i_2 > 255: i_2 = 255
             if i_2 < 0: i_2 = 0
             dac_2.write(i_2)
+            
+        elif texto[0] == 'V': # Llegir el voltatge
+            V_cond = adc_1.read
 
         # optional feedback
         print(i_1, i_2)

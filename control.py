@@ -23,9 +23,9 @@ class EnergyState:
         self.storage = 0.0
 
                 # ------------ DADES ----------------
-        # Condensador pot ser de 12 mF, 2.2 i 24 (crec)
-        self.V_bus = 10.0       # Tensió nominal (V)
-        self.C = 24             # Capacitat ajustada per a corrents de max 25.5A
+        # Condensador de 12000 uF (12 mF) i max 50V
+        self.V_bus = 40       # Tensió nominal (V)
+        self.C = 12             # Capacitat ajustada per a corrents de max 25.5A
         self.dt = 1             # Pas de temps (en hores). 0.002h = 7.2s de simulació per pas.        
         self.speed = 100        # Velocitat de la simulació
                                 # To make simulation go faster, decrease this; to slow it down, increase it.
@@ -43,7 +43,7 @@ class EnergyState:
             self.dades_irradiancia = df_setmana['G(i)'].values
             self.dades_temps = df_setmana['time'].dt.strftime('%Y%m%d:%H%M').values
             self.total_hores = len(self.dades_irradiancia)
-            print(f"✅ Simulació 10V / 25A preparada: {self.total_hores} hores.")
+            print(f"✅ Simulació 40V / 25A preparada: {self.total_hores} hores.")
         except Exception as e:
             print(f"❌ Error dades: {e}")
             self.dades_irradiancia = [0]*168
@@ -65,19 +65,19 @@ class EnergyController:
         served = [True, False, False]
         
         # If the bus is well-charged (>10.5V), use stored energy for all loads
-        if s.V_bus > 5.5:
+        if s.V_bus > 38.0: # Adjusted from 5.5V for 40V nominal bus
             served = [True, True, True]
         # Otherwise, if voltage is healthy, allow them only if Solar can sustain them (>10.2)
-        elif s.V_bus > 5.2:
+        elif s.V_bus > 37.0: # Adjusted from 5.2V
             if i_pv_potential >= (load_amps[0] + load_amps[1] + load_amps[2]):
                 served = [True, True, True]
             elif i_pv_potential >= (load_amps[0] + load_amps[1]):
                 served = [True, True, False]
 
         # 2. Grid Compensation (Only for Red Load)
-        # Grid kicks in only if V_bus < 10.0V. Since non-criticals shed at 10.1V,
-        # the grid effectively only supports Load 0.
-        i_grid = max(0, (5.0 - s.V_bus) * 15.0) if s.V_bus < 5.0 else 0
+        # Grid kicks in if V_bus drops below 35V.
+        # The gain (1.0) is adjusted for the higher voltage range.
+        i_grid = max(0, (35.0 - s.V_bus) * 1.0) if s.V_bus < 35.0 else 0
 
         return i_pv_potential, i_grid, served
 
@@ -217,7 +217,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # Inverter Control: Throttle PV if voltage exceeds safe limits
         i_pv = i_pv_potential
         i_cons_total = sum(effective_load) * self.state.escala_I
-        if self.state.V_bus >= 14.5:
+        # Start throttling slightly before reaching the 42V limit
+        if self.state.V_bus >= 41.5:
             i_pv = min(i_pv_potential, i_cons_total)
 
         # --- Grid current ---
@@ -236,16 +237,16 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         # --- Capacitor dynamics ---
         # dV = (I_net / C) * dt
         self.state.V_bus += (i_net / self.state.C) * self.state.dt
-        # Límits de seguretat
-        self.state.V_bus = max(0, min(self.state.V_bus, 15.0)) 
+        # Security limits (max 42V as per request)
+        self.state.V_bus = max(0, min(self.state.V_bus, 42.0)) 
 
         # --- Protecció de sobre-tensió: Desconnexió solar si el bus està ple ---
-        if self.state.V_bus >= 14.98 and i_pv > i_cons_total:
+        if self.state.V_bus >= 41.9 and i_pv > i_cons_total: # Adjusted from 14.98V (close to 42V limit)
             if self.state.pv_on:
                 self.toggle_pv()
         
         # --- Auto-reconnect: If load is present and voltage is safe ---
-        if not self.state.pv_on and self.state.V_bus < 13.5 and i_cons_total > 0:
+        if not self.state.pv_on and self.state.V_bus < 39.0 and i_cons_total > 0: # Adjusted from 13.5V
             self.toggle_pv()
 
         ts = self.state.dades_temps[self.index_hora]
@@ -272,8 +273,8 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.lcdNumber_4.display(float(f"{p_grid_w / self.state.V_bus:.1f}"))    # Grid power W
         self.lcdNumber_5.display(float(f"{self.state.V_bus:.2f}")) # Bus Voltage
         
-        # SoC calculation (0-15V range mapped to 0-100%)
-        soc = (self.state.V_bus / 15.0) * 100
+        # SoC calculation (Mapped to the 42V security limit)
+        soc = (self.state.V_bus / 42.0) * 100
         self.lcdNumber_11.display(float(f"{soc:.1f}"))
         self.lcdNumber_12.display(float(f"{(i_net):.1f}"))    # Condenser current
         

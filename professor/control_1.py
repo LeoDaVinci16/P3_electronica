@@ -5,10 +5,8 @@ from collections import deque
 
 from control_ui import Ui_MainWindow
 
-
 # ---------------- SERIAL ----------------
 ser = serial.Serial("COM4", 115200, timeout=0.1)
-
 
 # ---------------- MAIN ----------------
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
@@ -60,7 +58,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
             except:
                 pass
-
 
 # ---------------- RUN ----------------
 app = QtWidgets.QApplication([])
