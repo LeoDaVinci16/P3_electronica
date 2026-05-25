@@ -2,20 +2,19 @@
 
 Aquest projecte implementa un sistema de gestió energètica per a una micro-xarxa DC, combinant un motor de simulació física amb una implementació real mitjançant un microcontrolador ESP32. El sistema permet monitoritzar el balanç de potències, gestionar càrregues crítiques i controlar l'emmagatzematge d'energia.
 
-## 📂 Estructura del Projecte
-
-El programari està dividit en mòduls independents per facilitar el manteniment i permetre l'execució en mode simulat o real:
+## 📂 Estructura de Fitxers
 
 ```text
 P3/
-├── main.py              # Orquestrador principal per a l'ús amb Hardware Real.
-├── simulation.py        # Orquestrador per a l'execució en mode Simulació Pura.
-├── brain.py             # Cervell del sistema: lògica de control i escalat de dades.
-├── gui.py               # Gestió de les finestres gràfiques i interfície PyQt5.
-├── control_esp32.py     # Driver de comunicació sèrie (DAC/ADC) amb l'ESP32.
-├── ui.py                # Classe d'interfície generada a partir de QtDesigner.
-├── irradiancia.csv      # Base de dades solar hora a hora (Barcelona).
-└── uControl_0.py        # Codi MicroPython per instal·lar a l'ESP32.
+├── main.py              # Orquestrador per a l'ús amb Hardware Real al laboratori.
+├── simulation.py        # Orquestrador per a Simulació Pura (100% Software).
+├── hybrid.py            # Orquestrador Hardware-in-the-Loop (HIL) per a l'ESP32.
+├── brain.py             # Cervell: Lògica de control, Shedding i presa de decisions.
+├── gui.py               # Interfície gràfica PyQt5 i monitorització de hardware.
+├── control_esp32.py     # Driver de comunicació sèrie (DAC/PWM/ADC) per al PC.
+├── ui.py                # Classe d'interfície generada (QtDesigner).
+├── irradiancia.csv      # Dades d'irradiància solar de Barcelona (PVGiS).
+└── uControl_0.py        # Firmware MicroPython per a l'ESP32 (amb oversampling).
 ```
 
 ## ⚡ Especificacions de la Micro-xarxa
@@ -23,50 +22,36 @@ P3/
 El sistema simula i controla un bus de corrent continu amb els següents paràmetres:
 
 *   **Tensió Nominal del Bus:** 40 V.
-*   **Tensió Màxima de Seguretat:** 50 V.
-*   **Emmagatzematge:** Condensador electrolític de 12.000 µF (12 mF).
+*   **Tensió Màxima de Seguretat:** 50 V (Límit físic del condensador).
+*   **Emmagatzematge:** Condensador de 12.000 µF (12 mF).
 *   **Generació FV:** Basada en dades reals del PVGiS (Barcelona), escalada a 1000W pic.
-*   **Generació de Xarxa:** Font de suport externa capaç d'injectar potència si la bateria s'exhaureix.
+*   **Suport de Xarxa:** Font d'importació (només consum) de fins a 2550W.
 *   **Càrregues:** 
-    *   **Càrrega 1 (Roig):** Crítica (mai es desconnecta voluntàriament).
-    *   **Càrrega 2 (Blau) i 3 (Verd):** No crítiques (gestionades pel sistema).
+    *   **Càrrega 1 (Roig):** Crítica.
+    *   **Càrrega 2 (Blau) i 3 (Verd):** No crítiques (gestionades per Load Shedding).
 
-## 🧠 Lògica de Control
+### Dimensionament del Sistema
+El sistema està dissenyat per a potències d'uns **2.5 kW**. La capacitat de **12 mF** s'ha modelat amb un comportament exponencial (incloent una resistència de pèrdues de 200Ω) per simular la realitat física. El SoC es calcula linealment: **0V = 0%** i **50V = 100%**.
 
-La presa de decisions es realitza dins de `brain.py` seguint aquests criteris:
+## 🧠 Lògica de Control (brain.py)
 
 ### 1. Gestió de Càrregues (Load Shedding)
-Per garantir l'estabilitat del sistema i la supervivència de la càrrega crítica:
-*   Si la tensió del bus **cau per sota de 30V**, el sistema desconnecta automàticament les càrregues **Blava i Verda**. Els seus lliscadors a la interfície tornen a la posició 0 per avisar l'usuari.
+Si $V_{bus} < 30V$, el sistema força la desconnexió de les càrregues **Blava i Verda** i posa els seus lliscadors a 0.
 
 ### 2. Suport de Xarxa Elèctrica
-*   La xarxa només consumeix energia per injectar-la al bus (importació).
-*   **Mode Manual:** L'usuari tria quina potència importar amb el lliscador vertical (0-2550W).
-*   **Mode Automàtic:** Si el bus baixa dels **30V** i la càrrega crítica està activa, la xarxa injecta potència addicional proporcional a l'error de tensió per mantenir el bus estable.
-
-### 3. Estat de Càrrega (SoC)
-En tractar-se d'un condensador, l'estat de càrrega es modela de forma lineal respecte al voltatge:
-*   **0% SoC:** 0 V.
-*   **100% SoC:** 50 V.
-*   *Nota:* El sistema treballa normalment entre el 60% (30V) i el 80% (40V).
+*   **Mode Automàtic:** Si $V_{bus} < 30V$ i la càrrega roja està encesa, s'activa un control proporcional ($K_p=100$) per mantenir la tensió.
+*   **Protecció per Sobretensió:** Si $V_{bus} > 35V$, la xarxa es desconnecta forçadament (slider a 0) per evitar sobrecarregar el condensador.
 
 ## 🖥️ Funcionament de l'SCADA (GUI)
 
-L'aplicació obre diverses finestres per a una monitorització completa:
-
-1.  **Finestra de Control:** Interfície principal amb els lliscadors de consum i xarxa, i marcadors LCD de potències (W), corrents (A) i voltatges (V).
-2.  **Monitorització en Temps Real:** Un mosaic 2x2 amb:
-    *   **Tensió del Bus:** Comparativa entre el valor Simulat (groc) i el Real (magenta).
-    *   **SoC:** Evolució del percentatge d'energia emmagatzemada.
-    *   **Balanç de Potències:** Corbes de Solar, Xarxa, Consum i potència neta al condensador.
-    *   **Intensitats:** Visualització de la KCL (Llei de Kirchhoff) on es veu que la suma de corrents és zero.
-3.  **Monitor de l'ESP32 (Només Hardware):** Gràfiques de baix nivell que mostren els volts reals (0-3.3V) als pins físics DAC 25, DAC 26 i ADC 34.
+*   **Balanç de Potències:** Convenció de signes on fonts (Solar/Xarxa) són positives i receptors (Consum/Càrrega Condensador) són negatius. La suma visual a la línia de zero valida la Llei de Kirchhoff.
+*   **Data i Temps:** Sincronitzat amb el fitxer d'irradiància; mostra la durada de la prova i la data real de 2023.
+*   **Monitor ESP32:** Gràfiques en volts (0-3.3V) per depurar DACs i ADCs.
 
 ## 🚀 Execució
 
-### Mode Simulació Pura
-Ideal per provar la lògica a casa sense necessitat de tenir l'ESP32 connectat. Utilitza un model físic iteratiu (aproximació d'Euler) per calcular la tensió del condensador.
-
+### 1. Mode Simulació Pura (`simulation.py`)
+Simulació numèrica d'Euler amb oversampling i filtratge de pèrdues. No requereix hardware.
 ```bash
 python simulation.py
 ```

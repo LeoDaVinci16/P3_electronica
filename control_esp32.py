@@ -9,11 +9,13 @@ class ESP32Controller:
             print(f"Error Sèrie: {e}")
             self.ser = None
 
-    def send_data(self, dac_a, dac_b):
+    def send_data(self, dac_a, dac_b, v_sim_scaled=None):
         if self.ser:
             try:
                 self.ser.write(f"A{int(dac_a)}\n".encode())
                 self.ser.write(f"B{int(dac_b)}\n".encode())
+                if v_sim_scaled is not None:
+                    self.ser.write(f"V{int(v_sim_scaled)}\n".encode())
             except: pass
 
     def read_adc(self):
@@ -27,9 +29,9 @@ class ESP32Controller:
                 lines = raw_data.strip().split('\n')
                 for line in reversed(lines):
                     parts = line.split()
-                    if len(parts) == 3:
+                    if len(parts) >= 3:
                         try:
-                            return int(parts[2])
+                            return [int(p) for p in parts[2:]]
                         except ValueError:
                             continue
         except: pass

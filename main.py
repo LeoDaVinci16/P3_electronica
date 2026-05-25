@@ -27,7 +27,8 @@ class MainApp:
     def run_loop(self):
         # 1. Inputs
         inputs = self.gui.get_inputs()
-        adc_raw = self.esp32.read_adc()
+        adcs = self.esp32.read_adc()
+        adc_raw = adcs[0] if isinstance(adcs, list) else adcs
         
         # Necessitem una estimació del voltatge actual per al Brain
         # Fem servir l'últim valor conegut si adc_raw és None per evitar salts

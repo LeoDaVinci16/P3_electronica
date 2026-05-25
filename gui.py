@@ -74,29 +74,43 @@ class GUI(QtWidgets.QMainWindow, Ui_MainWindow):
     def _setup_hw_monitor(self):
         # Finestra per a senyals de baix nivell (Pins ESP32)
         self.hw_win = pg.GraphicsLayoutWidget(title="Monitorització de l'ESP32")
-        self.hw_win.resize(400, 800)
+        self.hw_win.resize(400, 900)
         
         # DAC 25 (Solar)
         self.p_dac25 = self.hw_win.addPlot(title="Pin 25: DAC Solar (V)")
         self.p_dac25.setYRange(0, 3.3)
-        self.curve_dac25 = self.p_dac25.plot(pen='orange')
+        self.p_dac25.addLegend()
+        self.curve_dac25 = self.p_dac25.plot(pen='orange', name="Ordre (DAC)")
+        self.curve_adc35 = self.p_dac25.plot(pen='m', name="Mesura (ADC35)")
         
         self.hw_win.nextRow()
         
-        # DAC 26 (Xarxa)
-        self.p_dac26 = self.hw_win.addPlot(title="Pin 26: DAC Xarxa (V)")
+        # DAC 26 (VBus Simulat)
+        self.p_dac26 = self.hw_win.addPlot(title="Pin 26: DAC VBus Sim (V)")
         self.p_dac26.setYRange(0, 3.3)
-        self.curve_dac26 = self.p_dac26.plot(pen='cyan')
+        self.curve_dac26 = self.p_dac26.plot(pen='y')
         
         self.hw_win.nextRow()
         
-        # ADC 34 (Bus)
-        self.p_adc34 = self.hw_win.addPlot(title="Pin 34: ADC Bus (V)")
+        # ADC 34 (Llegit de Pin 26)
+        self.p_adc34 = self.hw_win.addPlot(title="Pin 34: ADC Lectura Bus (V)")
         self.p_adc34.setYRange(0, 3.3)
-        self.curve_adc34 = self.p_adc34.plot(pen='m')
+        self.p_adc34.addLegend()
+        self.curve_adc34 = self.p_adc34.plot(pen='m', name="Llegit (ADC)")
+        # Afegim la referència teòrica enviada
+        self.curve_vsim_hw = self.p_adc34.plot(pen=pg.mkPen('w', style=QtCore.Qt.DashLine), name="Teòric (Sim)")
+
+        self.hw_win.nextRow()
+
+        # Pin 27 (PWM Xarxa)
+        self.p_pwm27 = self.hw_win.addPlot(title="Pin 27: PWM Xarxa (Status)")
+        self.p_pwm27.setYRange(0, 3.3)
+        self.p_pwm27.addLegend()
+        self.curve_pwm27 = self.p_pwm27.plot(pen='cyan', name="Ordre (PWM)")
+        self.curve_adc32 = self.p_pwm27.plot(pen='m', name="Mesura (ADC32)")
 
         self.hw_win.show()
-        self.hw_h = {k: deque(maxlen=200) for k in ['d25', 'd26', 'a34']}
+        self.hw_h = {k: deque(maxlen=200) for k in ['d25', 'd26', 'a34', 'vsim', 'p27', 'a35', 'a32']}
 
     def _enable_controls(self):
         self.verticalSlider_2.setEnabled(True)
@@ -198,16 +212,27 @@ class GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         # Actualitzar Gràfics Hardware (Scalant a 0-3.3V)
         if self.show_hw:
             v_d25 = (data['dac_pv'] / 255) * 3.3
-            v_d26 = (data['dac_grid'] / 255) * 3.3
-            v_a34 = (data['adc_raw'] / 4095) * 3.3
+            v_d26 = (data.get('v_sim_scaled', 0) / 255) * 3.3
+            v_a34 = (data.get('adc_raw', 0) / 4095) * 3.3
+            v_a35 = (data.get('adc_pv_raw', 0) / 4095) * 3.3
+            v_a32 = (data.get('adc_grid_raw', 0) / 4095) * 3.3
+            v_p27 = (data['dac_grid'] / 255) * 3.3
 
             self.hw_h['d25'].append(v_d25)
             self.hw_h['d26'].append(v_d26)
             self.hw_h['a34'].append(v_a34)
+            self.hw_h['a35'].append(v_a35)
+            self.hw_h['a32'].append(v_a32)
+            self.hw_h['vsim'].append(v_d26) # La referència és el propi DAC26
+            self.hw_h['p27'].append(v_p27)
 
             self.curve_dac25.setData(list(self.hw_h['d25']))
+            self.curve_adc35.setData(list(self.hw_h['a35']))
             self.curve_dac26.setData(list(self.hw_h['d26']))
             self.curve_adc34.setData(list(self.hw_h['a34']))
+            self.curve_vsim_hw.setData(list(self.hw_h['vsim']))
+            self.curve_pwm27.setData(list(self.hw_h['p27']))
+            self.curve_adc32.setData(list(self.hw_h['a32']))
 
     def close_all(self):
         self.graph_win.close()

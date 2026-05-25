@@ -66,19 +66,28 @@ class Brain:
         # Si adc_raw és 0 (GND), v_bus_real serà 0V
         v_bus_real = (adc_raw / 4095.0 * 50.0) if adc_raw is not None else current_vbus
 
-        # 5. Calcular valors per als DACs
-        # DAC A (Pin 25): Fotovoltaica segons CSV (0-1000W -> 0-255)
-        dac_pv = int(max(0, min(255, (p_solar / 1000.0) * 255.0)))
+        # 5. Protecció PV (Sobretensió)
+        # Si el bus supera els 45V, tallem la injecció PV per protegir el hardware real.
+        pv_forced_off = False
+        if current_vbus > 45.0:
+            pv_forced_off = True
+            p_solar_effective = 0.0
+        else:
+            p_solar_effective = p_solar
+
+        # 6. Calcular valors per als DACs
+        # DAC A (Pin 25): Fotovoltaica (0-1000W -> 0-255)
+        dac_pv = int(max(0, min(255, (p_solar_effective / 1000.0) * 255.0)))
         # DAC B (Pin 26): Xarxa (Manual + Automàtic de seguretat)
         # El DAC de xarxa reflecteix el slider + l'ajuda automàtica
         dac_grid = int(max(0, min(255, (v_grid_slider if not grid_forced_off else 0) + (p_grid_auto / 10.0))))
 
         return {
-            'p_solar': p_solar, 'p_grid': p_grid, 'p_cons': p_cons,
+            'p_solar': p_solar_effective, 'p_grid': p_grid, 'p_cons': p_cons,
             'v_bus_real': v_bus_real, 'served': served,
             'dac_pv': dac_pv, 'dac_grid': dac_grid,
             'adc_raw': adc_raw if adc_raw is not None else 0,
-            'grid_forced_off': grid_forced_off,
+            'grid_forced_off': grid_forced_off, 'pv_forced_off': pv_forced_off,
             'timestamp': ts
         }
 
