@@ -1,125 +1,57 @@
-# -*- coding: utf-8 -*-
-import pandas as pd
+import sys
+import serial
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtCore import QTimer
 import pyqtgraph as pg
+import csv
 from collections import deque
+import random
+import os
+
+# Importem la interfície des de ui.py (basada en ui_v3.ui)
 from ui import Ui_MainWindow
 
-# =========================================================
-# MODEL
-# =========================================================
-class EnergyState:
-    def __init__(self):
-        self.load = [0, 0, 0]
-        self.load_enabled = [True, True, True]
+# ---------------- CONFIGURACIÓ SERIAL ----------------
+try:
+    ser = serial.Serial("COM4", 115200, timeout=0.05)
+except Exception as e:
+    print(f"Error port sèrie COM4: {e}. Mode simulat actiu.")
+    ser = None
 
-        self.pv = 0
-        self.pv_on = True
-
-        self.grid_base = 0
-        self.grid = 0
-
-        self.storage = 0.0
-
-                # ------------ DADES ----------------
-        # Condensador de 12000 uF (12 mF) i max 50V
-        self.V_bus = 40       # Tensió nominal (V)
-        self.C = 12             # Capacitat ajustada per a corrents de max 25.5A
-        self.dt = 1             # Pas de temps (en hores). 0.002h = 7.2s de simulació per pas.        
-        self.speed = 100        # Velocitat de la simulació
-                                # To make simulation go faster, decrease this; to slow it down, increase it.
-        self.escala_I = 0.01     # Factor de conversió: Slider 100 -> 10 Amperis
-        
-        try:
-            nom_fitxer = 'irradiancia.csv'
-
-            df = pd.read_csv(nom_fitxer, skiprows=8, skipfooter=10, engine='python')
-            df['time'] = pd.to_datetime(df['time'], format='%Y%m%d:%H%M')
-            
-            # Filtre de setmana (168 hores)
-            df_setmana = df.iloc[0:8760] 
-            
-            self.dades_irradiancia = df_setmana['G(i)'].values
-            self.dades_temps = df_setmana['time'].dt.strftime('%Y%m%d:%H%M').values
-            self.total_hores = len(self.dades_irradiancia)
-            print(f"✅ Simulació 40V / 25A preparada: {self.total_hores} hores.")
-        except Exception as e:
-            print(f"❌ Error dades: {e}")
-            self.dades_irradiancia = [0]*168
-            self.dades_temps = ["00000000:0000"]*168
-
-
-# =========================================================
-# CONTROLLER
-# =========================================================
-class EnergyController:
-    def compute(self, s):
-        # Determine potential PV current based on irradiance
-        i_pv_potential = s.pv if s.pv_on else 0
-        load_amps = [l * s.escala_I for l in s.load]
-        
-        # 1. Load Shedding Logic
-        # Load 0 (Red) is critical. Loads 1 & 2 are shed if V_bus drops
-        # indicating PV + Condenser cannot satisfy the total demand.
-        served = [True, False, False]
-        
-        # If the bus is well-charged (>10.5V), use stored energy for all loads
-        if s.V_bus > 38.0: # Adjusted from 5.5V for 40V nominal bus
-            served = [True, True, True]
-        # Otherwise, if voltage is healthy, allow them only if Solar can sustain them (>10.2)
-        elif s.V_bus > 37.0: # Adjusted from 5.2V
-            if i_pv_potential >= (load_amps[0] + load_amps[1] + load_amps[2]):
-                served = [True, True, True]
-            elif i_pv_potential >= (load_amps[0] + load_amps[1]):
-                served = [True, True, False]
-
-        # 2. Grid Compensation (Only for Red Load)
-        # Grid kicks in if V_bus drops below 35V.
-        # The gain (1.0) is adjusted for the higher voltage range.
-        i_grid = max(0, (35.0 - s.V_bus) * 1.0) if s.V_bus < 35.0 else 0
-
-        return i_pv_potential, i_grid, served
-
-
-# =========================================================
-# MAIN WINDOW
-# =========================================================
 class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
-        self.state = EnergyState()
-        # ----------------- SIMULATION TIME --------------------------        
-        self.simulation_time = 0.0        
-        self.dt = self.state.dt
-
         self.setupUi(self)
 
-        for lcd in [self.lcdNumber_6, self.lcdNumber_7, self.lcdNumber_9, self.lcdNumber_10,
-                    self.lcdNumber_1, self.lcdNumber_2, self.lcdNumber_3,
-                    self.lcdNumber, self.lcdNumber_4, self.lcdNumber_12,
-                    self.lcdNumber_13, self.lcdNumber_14, self.lcdNumber_15]:
-            lcd.setDigitCount(5)
+        # --- Variables de Simulació ---
+        self.v_bus = 400.0  # Voltatge inicial (V)
+        self.soc = 50.0     # Estat de càrrega inicial (%)
+        self.cap_bus = 0.01 # Capacitat del condensador de bus (F)
+        self.dt = 0.05      # Pas de temps (50ms)
+        
+        # --- Càrrega de dades d'irradiància ---
+        self.solar_data = []
+        try:
+            csv_path = os.path.join(os.path.dirname(__file__), 'irradiancia.csv')
+            with open(csv_path, 'r') as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    # Busquem línies que comencin amb data (2023...) o números
+                    if row and row[0] and row[0][0].isdigit():
+                        try:
+                            # La columna 1 (segona) és G(i) - irradiància
+                            self.solar_data.append(float(row[1]))
+                        except: continue
+        except Exception as e:
+            print(f"Error llegint CSV: {e}. Generant dades simulades.")
+            self.solar_data = [500 + 200*random.uniform(-1,1) for _ in range(500)]
+        
+        if not self.solar_data: self.solar_data = [500.0]
+        self.solar_idx = 0
 
-        from PyQt5 import QtGui
-
-        def set_lcd_color(lcd, color):
-            pal = lcd.palette()
-            pal.setColor(QtGui.QPalette.WindowText, QtGui.QColor(color))
-            lcd.setPalette(pal)
-            lcd.setStyleSheet("")
-            lcd.setSegmentStyle(QtWidgets.QLCDNumber.Flat)
-
-        set_lcd_color(self.lcdNumber_1, "red")
-        set_lcd_color(self.lcdNumber_2, "blue")
-        set_lcd_color(self.lcdNumber_3, "green")
-
-        self.lcdNumber_8.setDigitCount(5) # Bus Voltage (e.g. 10.00)
-
-        self.controller = EnergyController()
-
-        # History deques for plotting
-        self.hist_vbus = deque(maxlen=500)
+        # Històrics per als gràfics
+        self.hist_vbus = deque(maxlen=200)
+        self.hist_vbus_adc = deque(maxlen=200)
         self.hist_soc = deque(maxlen=200)
         self.hist_solar = deque(maxlen=200)
         self.hist_grid = deque(maxlen=200)
@@ -129,34 +61,27 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.hist_i_cons = deque(maxlen=200)
         self.hist_i_net = deque(maxlen=200)
 
-        QtCore.QTimer.singleShot(0, self.step)
-
-        self.index_hora = 0 
-        self.corrent_pv = 0
-        self.corrent_xarxa = 0
-        self.carga_1 = self.carga_2 = self.carga_3 = 0
-        self.xarxa_conectada = False
-
-        # ---------------- GRAPH WINDOW ----------------
-        self.graph_win = pg.GraphicsLayoutWidget(title="Monitorització de la Micro-xarxa")
-        # Ajustem la mida de la finestra a la totalitat de la pantalla disponible
+        # --- Configuració de la Finestra de Gràfics (Mosaic 2x2 a pantalla completa) ---
+        self.graph_win = pg.GraphicsLayoutWidget(title="SCADA Micro-xarxa: Simulació + Hardware")
         screen = QtWidgets.QApplication.primaryScreen().availableGeometry()
         self.graph_win.setGeometry(screen)
-
-        # Plot 1: Voltage
+        
+        # (0,0): Voltatge
         self.p1 = self.graph_win.addPlot(title="Tensió del Bus (V)")
         self.p1.showGrid(x=True, y=True)
-        self.curve_vbus = self.p1.plot(pen='y')
+        self.p1.addLegend()
+        self.curve_vbus = self.p1.plot(pen=pg.mkPen('y', width=2), name="Simulat")
+        self.curve_vbus_adc = self.p1.plot(pen='m', name="Mesurat (ADC34)")
         
-        # Plot 2: SoC
+        # (0,1): SoC
         self.p2 = self.graph_win.addPlot(title="Estat de Càrrega SoC (%)")
         self.p2.showGrid(x=True, y=True)
         self.p2.setYRange(0, 100)
         self.curve_soc = self.p2.plot(pen='g')
         
-        self.graph_win.nextRow() # Saltem a la segona fila per crear el mosaic 2x2
+        self.graph_win.nextRow()
         
-        # Plot 3: Powers (W)
+        # (1,0): Potències
         self.p3 = self.graph_win.addPlot(title="Potències (W)")
         self.p3.showGrid(x=True, y=True)
         self.p3.addLegend()
@@ -164,215 +89,124 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.curve_grid = self.p3.plot(pen=pg.mkPen('cyan', width=2), name='Xarxa')
         self.curve_cons = self.p3.plot(pen=pg.mkPen('red', width=2), name='Consum')
 
-        # Plot 4: Currents (A)
+        # (1,1): Corrents
         self.p4 = self.graph_win.addPlot(title="Corrent (A)")
         self.p4.showGrid(x=True, y=True)
         self.p4.addLegend()
         self.curve_i_solar = self.p4.plot(pen=pg.mkPen('orange', width=2), name='Solar (A)')
         self.curve_i_grid = self.p4.plot(pen=pg.mkPen('cyan', width=2), name='Xarxa (A)')
-        self.curve_i_cons = self.p4.plot(pen=pg.mkPen('red', width=2), name='Consum (A)')
-        self.curve_i_net = self.p4.plot(pen=pg.mkPen('w', width=1, style=QtCore.Qt.DashLine), name='Net/Cap (A)')
+        self.curve_i_cons = self.p4.plot(pen=pg.mkPen('r', width=2), name='Consum (A)')
+        self.curve_i_net = self.p4.plot(pen=pg.mkPen('w', width=1, style=QtCore.Qt.DashLine), name='Net (KCL)')
 
         self.graph_win.show()
-        # ---------------- TIMER ----------------
+
+        # Activar Sliders si estaven desactivats a la UI
+        self.verticalSlider_2.setEnabled(True)
+        self.horizontalSlider_1.setEnabled(True)
+        self.horizontalSlider_2.setEnabled(True)
+        self.horizontalSlider_3.setEnabled(True)
+
+        # --- Timer ---
         self.timer = QTimer()
         self.timer.timeout.connect(self.step)
+        self.timer.start(50)
 
-        # Real-time interval between steps (ms). 
-        self.timer.start(self.state.speed) 
-
-        # ---------------- INPUTS ----------------
-        self.horizontalSlider_1.valueChanged.connect(lambda v: self.set_load(0, v))
-        self.horizontalSlider_2.valueChanged.connect(lambda v: self.set_load(1, v))
-        self.horizontalSlider_3.valueChanged.connect(lambda v: self.set_load(2, v))
-
-        self.verticalSlider_2.valueChanged.connect(self.set_grid)
-
+        # Connectar botó EXIT (pushButton_3 a ui.py)
         self.pushButton_3.clicked.connect(self.closeAll)
 
-    # ----------------------- LED INDICATORS --------------
-        self.state.load = [0, 0, 0]
-        self.state.pv = 0
-        self.state.grid = 0
-
-        self.horizontalSlider_1.setValue(0)
-        self.horizontalSlider_2.setValue(0)
-        self.horizontalSlider_3.setValue(0)
-
-        self.verticalSlider_2.setValue(0)
-
-    # =====================================================
-    # SIMULATION LOOP
-    # =====================================================
     def step(self):
-        # 1. Update state from irradiance data before computing logic
-        # Synchronize: index_hora only increments when simulation_time crosses an hour boundary
-        self.index_hora = int(self.simulation_time) % self.state.total_hores
+        # 1. Fonts de dades: Solar (CSV) i Xarxa (Slider)
+        p_solar_w = self.solar_data[self.solar_idx]
+        self.solar_idx = (self.solar_idx + 1) % len(self.solar_data)
         
-        irr = self.state.dades_irradiancia[self.index_hora]
-        self.state.pv = (irr / 1000.0) * 25.5  # Max 25.5A at peak irradiance
+        v_grid_cmd = self.verticalSlider_2.value() # 0-255
 
-        # 2. Run controller (returns i_pv, i_grid, enabled_loads)
-        i_pv_potential, i_grid, served = self.controller.compute(self.state)
+        # 2. Hardware: DACs (A=Solar, B=Grid) i lectura ADC34
+        v_bus_real = self.v_bus  # Fallback
+        if ser:
+            try:
+                # Enviar Solar a DAC Pin 25 (A)
+                dac_pv = int(max(0, min(255, (p_solar_w / 1000) * 255)))
+                ser.write(f"A{dac_pv}\n".encode())
+                # Enviar Xarxa a DAC Pin 26 (B)
+                ser.write(f"B{v_grid_cmd}\n".encode())
+                
+                while ser.in_waiting > 0:
+                    line = ser.readline().decode().strip()
+                
+                if line:
+                    parts = line.split()
+                    if len(parts) == 3:
+                        _, _, adc = map(int, parts)
+                        # Escalat ADC34 (0-4095) a un valor de voltatge de bus (ex: 0-600V)
+                        v_bus_real = (adc / 4095) * 600
+            except Exception:
+                pass
 
-        self.state.grid = i_grid
-
-        # Update UI slider for grid support visual feedback
-        self.verticalSlider_2.blockSignals(True)
-        self.verticalSlider_2.setValue(int(i_grid / self.state.escala_I))
-        self.verticalSlider_2.blockSignals(False)
-
-        effective_load = [
-            self.state.load[i] if served[i] else 0
-            for i in range(3)
-        ]
-
-        # Inverter Control: Throttle PV if voltage exceeds safe limits
-        i_pv = i_pv_potential
-        i_cons_total = sum(effective_load) * self.state.escala_I
-        # Start throttling slightly before reaching the 42V limit
-        if self.state.V_bus >= 41.5:
-            i_pv = min(i_pv_potential, i_cons_total)
-
-        # --- Grid current ---
-        # i_grid is already in Amperes from controller
-
-        # --- Load current (only served loads) ---
-        p_cons_total_w = (i_cons_total * self.state.V_bus)
-
-        # --- Generation current ---
-        i_gen_total = i_pv + i_grid
-        p_gen_total_w = (i_gen_total * self.state.V_bus)
-
-        # --- KCL ---
-        i_net = i_gen_total - i_cons_total
-
-        # --- Capacitor dynamics ---
-        # dV = (I_net / C) * dt
-        self.state.V_bus += (i_net / self.state.C) * self.state.dt
-        # Security limits (max 42V as per request)
-        self.state.V_bus = max(0, min(self.state.V_bus, 42.0)) 
-
-        # --- Protecció de sobre-tensió: Desconnexió solar si el bus està ple ---
-        if self.state.V_bus >= 41.9 and i_pv > i_cons_total: # Adjusted from 14.98V (close to 42V limit)
-            if self.state.pv_on:
-                self.toggle_pv()
+        # 3. Física de la simulació
+        # Xarxa: 127 és el punt neutre (0W).
+        p_grid_w = (v_grid_cmd - 127) * 20 
         
-        # --- Auto-reconnect: If load is present and voltage is safe ---
-        if not self.state.pv_on and self.state.V_bus < 39.0 and i_cons_total > 0: # Adjusted from 13.5V
-            self.toggle_pv()
+        # Consum: suma de lliscadors horitzontals (Càrregues 1, 2 i 3)
+        p_cons_w = (self.horizontalSlider_1.value() +
+                    self.horizontalSlider_2.value() +
+                    self.horizontalSlider_3.value()) * 5 
 
-        ts = self.state.dades_temps[self.index_hora]
-        self.label_date.setText(f"Durada total: {self.simulation_time:.1f} h \n\nData: {ts[6:8]}/{ts[4:6]}/2023 {ts[9:11]}:00 h")
-
-        # 4. LCDs (All Power values shown in W)
-        p_solar_w = (i_pv * self.state.V_bus)
-        p_grid_w = (i_grid * self.state.V_bus)  
-
-        self.lcdNumber_6.display(float(f"{p_solar_w:.1f}"))
-        self.lcdNumber_7.display(float(f"{p_grid_w:.1f}"))
-        self.lcdNumber_8.display(float(f"{self.state.V_bus:.2f}"))
-        self.lcdNumber_9.display(float(f"{p_gen_total_w:.1f}"))
-        self.lcdNumber_10.display(float(f"{p_cons_total_w:.1f}"))
-        self.lcdNumber_16.display(float(f"{(i_net * self.state.V_bus):.1f}"))    # Condenser power W
-
-        # Display current in Amperes for individual loads (1, 2, 3)
-        self.lcdNumber_1.display(effective_load[0] * self.state.escala_I) 
-        self.lcdNumber_2.display(effective_load[1] * self.state.escala_I)
-        self.lcdNumber_3.display(effective_load[2] * self.state.escala_I)
-
-        # --- Schematic Displays (Esquema) ---
-        self.lcdNumber.display(float(f"{p_solar_w / self.state.V_bus:.1f}"))        # Solar power W
-        self.lcdNumber_4.display(float(f"{p_grid_w / self.state.V_bus:.1f}"))    # Grid power W
-        self.lcdNumber_5.display(float(f"{self.state.V_bus:.2f}")) # Bus Voltage
+        # Corrents
+        i_solar = p_solar_w / self.v_bus
+        i_grid = p_grid_w / self.v_bus
+        i_cons = p_cons_w / self.v_bus 
         
-        # SoC calculation (Mapped to the 42V security limit)
-        soc = (self.state.V_bus / 42.0) * 100
-        self.lcdNumber_11.display(float(f"{soc:.1f}"))
-        self.lcdNumber_12.display(float(f"{(i_net):.1f}"))    # Condenser current
+        # Llei de corrents de Kirchhoff al condensador (Net)
+        i_net = i_solar + i_grid - i_cons 
         
-        self.lcdNumber_13.display(float(f"{effective_load[0] * self.state.escala_I:.1f}")) # Load 1 A
-        self.lcdNumber_14.display(float(f"{effective_load[1] * self.state.escala_I:.1f}")) # Load 2 A
-        self.lcdNumber_15.display(float(f"{effective_load[2] * self.state.escala_I:.1f}")) # Load 3 A
+        # Actualitzem voltatge del bus
+        self.v_bus += (i_net / self.cap_bus) * self.dt 
+        
+        # Actualitzem SoC (molt lentament)
+        self.soc -= (p_cons_w / 100000)
+        self.soc = max(0, min(100, self.soc))
 
-        self.checkBox.setChecked(self.state.load[0] > 0)
-        self.checkBox_3.setChecked(self.state.load[1] > 0)
-        self.checkBox_2.setChecked(self.state.load[2] > 0)
-
-        self.checkBox_7.setChecked(self.state.load[0] > 0)
-        self.checkBox_8.setChecked(self.state.load[1] > 0)
-        self.checkBox_9.setChecked(self.state.load[2] > 0)
-
-        # ---------------- GRAPH ----------------
-        self.hist_vbus.append(self.state.V_bus)
-        self.hist_soc.append(soc)
+        # 4. Actualització de dades i gràfics
+        self.hist_vbus.append(self.v_bus) 
+        self.hist_vbus_adc.append(v_bus_real)
+        self.hist_soc.append(self.soc)
         self.hist_solar.append(p_solar_w)
         self.hist_grid.append(p_grid_w)
-        self.hist_cons.append(p_cons_total_w)
-
-        self.hist_i_solar.append(i_pv)
+        self.hist_cons.append(p_cons_w)
+        
+        self.hist_i_solar.append(i_solar)
         self.hist_i_grid.append(i_grid)
-        self.hist_i_cons.append(-i_cons_total)
-        self.hist_i_net.append(-i_net)
+        self.hist_i_cons.append(-i_cons) # Negatiu per visualitzar consum
+        self.hist_i_net.append(-i_net)   # Net (hauria de tancar el cercle a 0)
 
         self.curve_vbus.setData(list(self.hist_vbus))
+        self.curve_vbus_adc.setData(list(self.hist_vbus_adc))
         self.curve_soc.setData(list(self.hist_soc))
         self.curve_solar.setData(list(self.hist_solar))
         self.curve_grid.setData(list(self.hist_grid))
         self.curve_cons.setData(list(self.hist_cons))
-
+        
         self.curve_i_solar.setData(list(self.hist_i_solar))
         self.curve_i_grid.setData(list(self.hist_i_grid))
         self.curve_i_cons.setData(list(self.hist_i_cons))
         self.curve_i_net.setData(list(self.hist_i_net))
+        
+        # Actualització de displays LCD de ui.py
+        self.lcdNumber_8.display(int(self.v_bus))       # Tensió Bus
+        self.lcdNumber_11.display(int(self.soc))      # SoC
+        self.lcdNumber_6.display(int(p_solar_w))      # Solar W
+        self.lcdNumber_7.display(int(p_grid_w))       # Xarxa W
+        self.lcdNumber_10.display(int(p_cons_w))      # Consum Total
+        self.lcdNumber_16.display(int(i_net * self.v_bus)) # Potència Cap
 
-        # ------------- set led slider to 0 if it breaks ----------------
-        sliders = [
-            self.horizontalSlider_1,
-            self.horizontalSlider_2,
-            self.horizontalSlider_3]
-
-        for i in (1, 2):
-            if not served[i] and sliders[i].value() != 0:
-                sliders[i].setValue(0)
-
-        # time:
-        self.simulation_time += self.dt
-    # =====================================================
-    # INPUT HANDLERS
-    # =====================================================
-    def set_load(self, i, value):
-        self.state.load[i] = value
-
-    def set_grid(self, value):
-        self.state.grid_base = value
-
-    # solar toggle WITH SLIDER RESET
-    def toggle_pv(self):
-        self.state.pv_on = not self.state.pv_on
-
-        if not self.state.pv_on:
-            self.state.pv = 0
-            print("S'ha desconectat la FV")
-        else:
-            print("S'ha connectat la FV")
-
-    # =====================================================
-    # CLOSE BOTH WINDOWS
-    # =====================================================
     def closeAll(self):
+        if ser: ser.close()
         self.graph_win.close()
         self.close()
-        print("S'ha apagat la aplicació")
 
-
-# =========================================================
-# MAIN
-# =========================================================
 if __name__ == "__main__":
-    import sys
-
     app = QtWidgets.QApplication(sys.argv)
-    w = MainWindow()
-    w.show()
+    window = MainWindow()
+    window.show()
     sys.exit(app.exec_())

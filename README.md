@@ -1,109 +1,95 @@
-# Sistema SCADA pel control de càrregues
+# Sistema SCADA de Control de Micro-xarxa (Simulació + Hardware)
 
-Aquest projecte implementa una interfície SCADA (Supervisory Control and Data Acquisition) en temps real per gestionar un sistema energètic híbrid que consta de generació fotovoltaica (FV), una conexió a la xarxa i múltiples càrregues de consum.
+Aquest projecte implementa un sistema de gestió energètica per a una micro-xarxa DC, combinant un motor de simulació física amb una implementació real mitjançant un microcontrolador ESP32. El sistema permet monitoritzar el balanç de potències, gestionar càrregues crítiques i controlar l'emmagatzematge d'energia.
 
-El sistema està dissenyat per monitoritzar el balanç energètic i assegurar que la càrrega crítica sempre estigui alimentada mitjançant la regulació automàtica del generador de reserva.
+## 📂 Estructura del Projecte
 
-El simulador, un cop inicialitzat el programa control_v3.py obre dues pestanyes. En la primera és el control SCADA del sistema simulat, mentre l’altra és una interfície que mostra l’evolució gràfica de diversos paràmetres del sistema.
+El programari està dividit en mòduls independents per facilitar el manteniment i permetre l'execució en mode simulat o real:
 
-Podeu trobar el projecte al següent link: https://github.com/LeoDaVinci16/P3_electronica
-
-
-## 🖥️ SCADA
-
-La finestra de l'SCADA permet manipular les càrregues i visualitzar els fluxos de potencia, l'estat de les diferents variables i el temps de simulació. Està dividida en 5 blocs principals:
-
-
-### Potencia d'entrada
-A la part superior esquerra de la interfície gràfica hi ha el requadre de potencia d’entrada. En aquest requadre hi ha els següents elements:
-- Dos marcadors que mostren la quantitat d’energia generada.
-    - L’energia solar és determinada per un arxiu d’irradiàncies anual hora a hora a la localitat de Barcelona, extret del PVGiS.
-    - L’energia aportada per la xarxa es controla amb un control  proporcional que mou automaticament l’slider que hi ha al costat del marcador.
-- Just a sota hi ha un marcador on mostra la potència global total disponible: solar + xarxa.
-
-### Potencia consumida
-A la part superior dreta hi ha el requadre d’energia consumida. Dins d’aquest hi ha els següents elements:
-
-- Tres sliders, que són els que permeten controlar manualment les tres càrregues i uns indicadors que mostren el valor, en Ampers, del corrent que circula per les càrregues. 
-    - Roig: Carrega crítica. Si no hi ha suficient potencia generada, s'utilitza la xarxa per subministrar-la.
-    - Blau: Càrrega no crítica, si no hi ha suficient potencia es desconecta automaticament.
-    - Verd: Càrrega no crítica, càrrega no crítica, si no hi ha suficient potencia es desconecta automaticament.
-- Un marcador la potència que es consumeix sumant el consum de totes les tres càrregues. Està situat sota els 3 sliders.
-
-### Emmagatzematge
-A la part central hi ha el requadre  “Emmagatzematge” dins d’aquest hi ha els següents elements:
-- Marcador de la tensió del bus.
-- Marcador de l’estat de càrrega (SoC) del condensador.
-- Marcador amb la potència entregada o subministrada pel condensador.
-
-### Esquema
-A la part inferior  hi ha el requadre “Esquema”, que mostra un esquema del circuit simulat. S'hi recullen les següents magnituds:
-
-- La tensió de bus del circuit (tensió al condensador).
-- Corrent a cada branca:
-    - Corrent fotovoltaica generada
-    - Corrent extreta de la xarxa
-    - Corrent subministrada o consumida pel condensador.
-    - Corrent consumida per cadascuna de les càrregues.
-
-![alt text](circuit.png)
-
-### Simulació
-Finalment hi ha un requadre que mostra el temps de simulació, la data (a partir de les dades d'irradiancia fotovoltaica) i el botó "exit" que serveix per tancar la finestra de l'SCADA i la dels gràfics en un sol clic.
-
-## 📈Gràfics en temps real
-
-Quan s'executa el progama a banda de l'SCADA s'obre una finestra amb les gràfiques en temps real que mostren les següents corbes:
-
-- Tensió del Bus (V)
-- Estat de Càrrega SoC (%)
-- Potències (W)
-    - Solar
-    - Xarxa
-    - Consum
-
-
-## 🛠️ Estructura del projecte
-
-- `control.py`: La lògica principal de l'aplicació i la gestió de la GUI.
-- `ui.py`: Classe Python generada a partir del fitxer `.ui` de Qt Designer.
-- `ui.ui`: El fitxer de disseny original per a Qt Designer.
-- `irradiancia.csv`: Fitxer amb les dades d'irradiancia obtingudes amb PVGiS
-- `requeriments.txt`: Paquets necessaris per executar el programa
-- `dibuix_rc.py`, `dibuix.qrc` i `circuit.png`: Fitxers per integrar la imatge de l'esquema del circuit a la interfície d'usuari.
-- `README.md`: Aquest document
-
-## 📋 Requisits previs
-
-Assegureu-vos de tenir Python 3.x instal·lat. També necessitareu les següents llibreries:
-
-```bash
-pip install PyQt5 pyqtgraph pyserial
+```text
+P3/
+├── main.py              # Orquestrador principal per a l'ús amb Hardware Real.
+├── simulation.py        # Orquestrador per a l'execució en mode Simulació Pura.
+├── brain.py             # Cervell del sistema: lògica de control i escalat de dades.
+├── gui.py               # Gestió de les finestres gràfiques i interfície PyQt5.
+├── control_esp32.py     # Driver de comunicació sèrie (DAC/ADC) amb l'ESP32.
+├── ui.py                # Classe d'interfície generada a partir de QtDesigner.
+├── irradiancia.csv      # Base de dades solar hora a hora (Barcelona).
+└── uControl_0.py        # Codi MicroPython per instal·lar a l'ESP32.
 ```
 
-## ⚙️ Instalació i us
+## ⚡ Especificacions de la Micro-xarxa
 
-### 1. Compilació de la UI
-Si modifiques l'arxiu `ui.ui` amb el Qt Designer, has de regenerar la classe Python:
+El sistema simula i controla un bus de corrent continu amb els següents paràmetres:
+
+*   **Tensió Nominal del Bus:** 40 V.
+*   **Tensió Màxima de Seguretat:** 50 V.
+*   **Emmagatzematge:** Condensador electrolític de 12.000 µF (12 mF).
+*   **Generació FV:** Basada en dades reals del PVGiS (Barcelona), escalada a 1000W pic.
+*   **Generació de Xarxa:** Font de suport externa capaç d'injectar potència si la bateria s'exhaureix.
+*   **Càrregues:** 
+    *   **Càrrega 1 (Roig):** Crítica (mai es desconnecta voluntàriament).
+    *   **Càrrega 2 (Blau) i 3 (Verd):** No crítiques (gestionades pel sistema).
+
+## 🧠 Lògica de Control
+
+La presa de decisions es realitza dins de `brain.py` seguint aquests criteris:
+
+### 1. Gestió de Càrregues (Load Shedding)
+Per garantir l'estabilitat del sistema i la supervivència de la càrrega crítica:
+*   Si la tensió del bus **cau per sota de 30V**, el sistema desconnecta automàticament les càrregues **Blava i Verda**. Els seus lliscadors a la interfície tornen a la posició 0 per avisar l'usuari.
+
+### 2. Suport de Xarxa Elèctrica
+*   La xarxa només consumeix energia per injectar-la al bus (importació).
+*   **Mode Manual:** L'usuari tria quina potència importar amb el lliscador vertical (0-2550W).
+*   **Mode Automàtic:** Si el bus baixa dels **30V** i la càrrega crítica està activa, la xarxa injecta potència addicional proporcional a l'error de tensió per mantenir el bus estable.
+
+### 3. Estat de Càrrega (SoC)
+En tractar-se d'un condensador, l'estat de càrrega es modela de forma lineal respecte al voltatge:
+*   **0% SoC:** 0 V.
+*   **100% SoC:** 50 V.
+*   *Nota:* El sistema treballa normalment entre el 60% (30V) i el 80% (40V).
+
+## 🖥️ Funcionament de l'SCADA (GUI)
+
+L'aplicació obre diverses finestres per a una monitorització completa:
+
+1.  **Finestra de Control:** Interfície principal amb els lliscadors de consum i xarxa, i marcadors LCD de potències (W), corrents (A) i voltatges (V).
+2.  **Monitorització en Temps Real:** Un mosaic 2x2 amb:
+    *   **Tensió del Bus:** Comparativa entre el valor Simulat (groc) i el Real (magenta).
+    *   **SoC:** Evolució del percentatge d'energia emmagatzemada.
+    *   **Balanç de Potències:** Corbes de Solar, Xarxa, Consum i potència neta al condensador.
+    *   **Intensitats:** Visualització de la KCL (Llei de Kirchhoff) on es veu que la suma de corrents és zero.
+3.  **Monitor de l'ESP32 (Només Hardware):** Gràfiques de baix nivell que mostren els volts reals (0-3.3V) als pins físics DAC 25, DAC 26 i ADC 34.
+
+## 🚀 Execució
+
+### Mode Simulació Pura
+Ideal per provar la lògica a casa sense necessitat de tenir l'ESP32 connectat. Utilitza un model físic iteratiu (aproximació d'Euler) per calcular la tensió del condensador.
+
 ```bash
-pyrcc5 dibuix.qrc -o dibuix_rc.py
-pyuic5 ui_v1.ui -o control_ui_v1.py
+python simulation.py
 ```
 
-### 2. Executar la simulació
-Per iniciar la interfície SCADA:
+### Mode Hardware Real
+Per utilitzar al laboratori amb el condensador real i l'ESP32.
+
+1.  Carrega `uControl_0.py` a l'ESP32 (MicroPython).
+2.  Connecta el Pin 25 (DAC Solar) i el Pin 26 (DAC Xarxa) al circuit de control.
+3.  Connecta el Pin 34 (ADC) al divisor de tensió del bus.
+4.  Executa a l'ordinador:
 
 ```bash
-python control_v1.py
+python main.py
 ```
 
-### 3. Configuració del maquinari (següent pas)
-Si feu servir un ESP32:
-1. Instal·leu `uControl.py` al vostre ESP32 amb Thonny o rshell.
-2. Connecteu l'ESP32 mitjançant USB.
-3. Definir els ports i implementar el sistema físic.
+## 🛠️ Requisits
+
+*   Python 3.x
+*   PyQt5
+*   PyQtGraph
+*   PySerial (per al mode hardware)
+*   Pandas (per processar el CSV d'irradiància)
 
 ---
-*Autors: Guillem Castillo i Arnau Coronado*
-
-*Desenvolupat com a part del Màster en Enginyeria Electrònica (P3 Electrònica).*
+*Projecte realitzat per Guillem Castillo i Arnau Coronado.*
