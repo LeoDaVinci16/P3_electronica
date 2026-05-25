@@ -29,7 +29,7 @@ class EnergyState:
         self.dt = 1             # Pas de temps (en hores). 0.002h = 7.2s de simulació per pas.        
         self.speed = 100        # Velocitat de la simulació
                                 # To make simulation go faster, decrease this; to slow it down, increase it.
-        self.escala_I = 0.1     # Factor de conversió: Slider 100 -> 10 Amperis
+        self.escala_I = 0.01     # Factor de conversió: Slider 100 -> 10 Amperis
         
         try:
             nom_fitxer = 'irradiancia.csv'
@@ -124,6 +124,10 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.hist_solar = deque(maxlen=200)
         self.hist_grid = deque(maxlen=200)
         self.hist_cons = deque(maxlen=200)
+        self.hist_i_solar = deque(maxlen=200)
+        self.hist_i_grid = deque(maxlen=200)
+        self.hist_i_cons = deque(maxlen=200)
+        self.hist_i_net = deque(maxlen=200)
 
         QtCore.QTimer.singleShot(0, self.step)
 
@@ -135,14 +139,14 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # ---------------- GRAPH WINDOW ----------------
         self.graph_win = pg.GraphicsLayoutWidget(title="Monitorització de la Micro-xarxa")
-        self.graph_win.resize(1000, 800)
+        # Ajustem la mida de la finestra a la totalitat de la pantalla disponible
+        screen = QtWidgets.QApplication.primaryScreen().availableGeometry()
+        self.graph_win.setGeometry(screen)
 
         # Plot 1: Voltage
         self.p1 = self.graph_win.addPlot(title="Tensió del Bus (V)")
         self.p1.showGrid(x=True, y=True)
         self.curve_vbus = self.p1.plot(pen='y')
-        
-        self.graph_win.nextRow()
         
         # Plot 2: SoC
         self.p2 = self.graph_win.addPlot(title="Estat de Càrrega SoC (%)")
@@ -150,7 +154,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.p2.setYRange(0, 100)
         self.curve_soc = self.p2.plot(pen='g')
         
-        self.graph_win.nextRow()
+        self.graph_win.nextRow() # Saltem a la segona fila per crear el mosaic 2x2
         
         # Plot 3: Powers (W)
         self.p3 = self.graph_win.addPlot(title="Potències (W)")
@@ -159,6 +163,15 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.curve_solar = self.p3.plot(pen=pg.mkPen('orange', width=2), name='Solar')
         self.curve_grid = self.p3.plot(pen=pg.mkPen('cyan', width=2), name='Xarxa')
         self.curve_cons = self.p3.plot(pen=pg.mkPen('red', width=2), name='Consum')
+
+        # Plot 4: Currents (A)
+        self.p4 = self.graph_win.addPlot(title="Corrent (A)")
+        self.p4.showGrid(x=True, y=True)
+        self.p4.addLegend()
+        self.curve_i_solar = self.p4.plot(pen=pg.mkPen('orange', width=2), name='Solar (A)')
+        self.curve_i_grid = self.p4.plot(pen=pg.mkPen('cyan', width=2), name='Xarxa (A)')
+        self.curve_i_cons = self.p4.plot(pen=pg.mkPen('red', width=2), name='Consum (A)')
+        self.curve_i_net = self.p4.plot(pen=pg.mkPen('w', width=1, style=QtCore.Qt.DashLine), name='Net/Cap (A)')
 
         self.graph_win.show()
         # ---------------- TIMER ----------------
@@ -297,11 +310,21 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.hist_grid.append(p_grid_w)
         self.hist_cons.append(p_cons_total_w)
 
+        self.hist_i_solar.append(i_pv)
+        self.hist_i_grid.append(i_grid)
+        self.hist_i_cons.append(-i_cons_total)
+        self.hist_i_net.append(-i_net)
+
         self.curve_vbus.setData(list(self.hist_vbus))
         self.curve_soc.setData(list(self.hist_soc))
         self.curve_solar.setData(list(self.hist_solar))
         self.curve_grid.setData(list(self.hist_grid))
         self.curve_cons.setData(list(self.hist_cons))
+
+        self.curve_i_solar.setData(list(self.hist_i_solar))
+        self.curve_i_grid.setData(list(self.hist_i_grid))
+        self.curve_i_cons.setData(list(self.hist_i_cons))
+        self.curve_i_net.setData(list(self.hist_i_net))
 
         # ------------- set led slider to 0 if it breaks ----------------
         sliders = [

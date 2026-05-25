@@ -32,9 +32,7 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.plot = self.graph_layout.addPlot(title="Lectura ADC Pin 34")
         self.curve = self.plot.plot(pen='y') # Línia groga
 
-        # Buffer de dades (200 punts)
         self.data = deque(maxlen=200)
-
         # Timer per actualitzar la interfície cada 50ms
         self.timer = QtCore.QTimer()    
         self.timer.timeout.connect(self.update_logic)
@@ -47,28 +45,34 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         ser.write(f"B{v}\n".encode())
 
     def update_logic(self):
-        if ser.in_waiting:
+        # Read all available lines to get the most recent one and clear the buffer
+        line = None
+        while ser.in_waiting > 0:
+            line = ser.readline().decode().strip()
+
+        if line:
             try:
-                line = ser.readline().decode().strip()
-                if line:
-                    # Separem els 3 valors que envia l'ESP32
-                    parts = line.split()
-                    if len(parts) == 3:
-                        i1, i2, adc = map(int, parts)
+                # Separem els 3 valors que envia l'ESP32
+                parts = line.split()
+                if len(parts) == 3:
+                    i1, i2, adc = map(int, parts)
 
-                        # 1. MOSTRAR PER TERMINAL (el que demanaves)
-                        print(f"DAC25: {i1} | DAC26: {i2} | ADC34: {adc}")
+                    # 1. MOSTRAR PER TERMINAL (el que demanaves)
+                    print(f"DAC25: {i1} | DAC26: {i2} | ADC34: {adc}")
+                    self.lcdNumber_6.display(i1)
+                    self.lcdNumber_7.display(i2)
+                    self.lcdNumber_8.display(adc)
 
-                        # 2. Actualitzar gràfica
-                        self.data.append(adc)
-                        self.curve.setData(list(self.data))
+                    # 2. Actualitzar gràfica
+                    self.data.append(adc)
+                    self.curve.setData(list(self.data))
 
-                        # 3. Actualitzar LCDs (si existeixen a la UI)
-                        if hasattr(self, 'lcdNumber_1'): self.lcdNumber_1.display(i1)
-                        if hasattr(self, 'lcdNumber_2'): self.lcdNumber_2.display(i2)
-                        if hasattr(self, 'lcdNumber_3'): self.lcdNumber_3.display(adc)
-            except Exception as e:
-                pass 
+                    # 3. Actualitzar LCDs (si existeixen a la UI)
+                    if hasattr(self, 'lcdNumber_1'): self.lcdNumber_1.display(i1)
+                    if hasattr(self, 'lcdNumber_2'): self.lcdNumber_2.display(i2)
+                    if hasattr(self, 'lcdNumber_3'): self.lcdNumber_3.display(adc)
+            except Exception:
+                pass
 
     def closeEvent(self, event):
         """Es tanca quan tanques la finestra"""
