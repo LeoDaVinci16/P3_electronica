@@ -9,13 +9,16 @@ class ESP32Controller:
             print(f"Error Sèrie: {e}")
             self.ser = None
 
-    def send_data(self, dac_a, dac_b, v_sim_scaled=None):
+    def send_data(self, dac_a, dac_b, v_pwm, pwm_r=None, pwm_g=None, pwm_b=None):
         if self.ser:
             try:
                 self.ser.write(f"A{int(dac_a)}\n".encode())
                 self.ser.write(f"B{int(dac_b)}\n".encode())
-                if v_sim_scaled is not None:
-                    self.ser.write(f"V{int(v_sim_scaled)}\n".encode())
+                self.ser.write(f"V{int(v_pwm)}\n".encode())
+                # LED Loads (prefixes: R=Red, G=Green, L=bLue)
+                if pwm_r is not None: self.ser.write(f"R{int(pwm_r)}\n".encode())
+                if pwm_g is not None: self.ser.write(f"G{int(pwm_g)}\n".encode())
+                if pwm_b is not None: self.ser.write(f"L{int(pwm_b)}\n".encode())
             except: pass
 
     def read_adc(self):

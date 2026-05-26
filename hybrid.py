@@ -12,13 +12,14 @@ class HybridApp:
     def __init__(self):
         self.app = QtWidgets.QApplication(sys.argv)
         
-        self.gui = GUI(show_hw=True)
+        self.gui = GUI(show_hw=True, mode='hybrid')
         self.gui.setWindowTitle("SCADA HÍBRID - Micro-xarxa")
         self.gui.show()
         
         self.brain = Brain()
         self.esp32 = ESP32Controller()
         self.sim = MicroGridSimulator() # Utilitzem la física per generar el voltatge teòric
+        self.sim_time_h = 0.0 # Initialize simulation time
 
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.run_loop)
@@ -39,6 +40,11 @@ class HybridApp:
 
         # 2. El Brain decideix basant-se en el voltatge LLEGIT
         processed = self.brain.process(inputs, adc_raw, v_adc)
+
+        # Update simulation time and display it
+        self.sim_time_h += 0.05 # Each 50ms loop iteration represents 0.05 hours
+        ts = processed['timestamp']
+        self.gui.label_date.setText(f"Durada total: {self.sim_time_h:.1f} h \n\nData: {ts[6:8]}/{ts[4:6]}/2023 {ts[9:11]}:00 h")
 
         # 3. El simulador calcula la física teòrica segons les potències del Brain
         # (Això genera el senyal que enviarem al Pin 27)

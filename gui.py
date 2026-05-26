@@ -4,10 +4,15 @@ from collections import deque
 from ui import Ui_MainWindow
 
 class GUI(QtWidgets.QMainWindow, Ui_MainWindow):
-    def __init__(self, show_hw=False):
+    def __init__(self, show_hw=False, mode='hybrid'):
         super().__init__()
         self.show_hw = show_hw
+        self.mode = mode
         self.setupUi(self)
+
+        # Actualitzem etiquetes per reflectir percentatge (%) en lloc d'Amperis
+        self.label_5.setText("CONSUM (%):") # Already updated in previous step
+        self.label_22.setText("%") # Change "Ampers" to "%" in schematic
 
         # Configuració de tots els LCDs per mostrar fins a 5 dígits
         lcds = [self.lcdNumber_1, self.lcdNumber_2, self.lcdNumber_3, self.lcdNumber_6, 
@@ -21,6 +26,10 @@ class GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         self._set_lcd_color(self.lcdNumber_1, "red")
         self._set_lcd_color(self.lcdNumber_2, "blue")
         self._set_lcd_color(self.lcdNumber_3, "green")
+
+        # Configure Grid Slider as percentage (0-100)
+        self.verticalSlider_2.setRange(0, 100)
+        self.verticalSlider_2.setEnabled(True)
 
         self._setup_plots()
         self._enable_controls()
@@ -51,66 +60,77 @@ class GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         
         self.graph_win.nextRow()
         
-        self.p3 = self.graph_win.addPlot(title="Balanç de Potències")
+        self.p3 = self.graph_win.addPlot(title="Balanç de Potències (W)")
         self.p3.setLabel('left', "Potència", units='W')
         self.p3.addLegend()
         self.curve_p_sol = self.p3.plot(pen=pg.mkPen('orange', width=2), name='Solar')
         self.curve_p_grid = self.p3.plot(pen=pg.mkPen('cyan', width=2), name='Xarxa')
         self.curve_p_cons = self.p3.plot(pen=pg.mkPen('red', width=2), name='Consum')
         self.curve_p_cap = self.p3.plot(pen=pg.mkPen('w', width=1, style=QtCore.Qt.DashLine), name='Capacitat')
-
-        self.p4 = self.graph_win.addPlot(title="Intensitats de la Micro-xarxa")
-        self.p4.setLabel('left', "Corrent", units='A')
+        
+        # Update plot for load duty cycles
+        self.p4 = self.graph_win.addPlot(title="Duty Cycle Càrregues (%)")
+        self.p4.setLabel('left', "Duty Cycle", units='%')
         self.p4.addLegend()
-        self.curve_i_sol = self.p4.plot(pen=pg.mkPen('orange', width=1), name='Solar (A)')
-        self.curve_i_grid = self.p4.plot(pen=pg.mkPen('cyan', width=1), name='Xarxa (A)')
-        self.curve_i_cons = self.p4.plot(pen=pg.mkPen('red', width=1), name='Consum (A)')
+        self.curve_i_sol = self.p4.plot(pen=pg.mkPen('orange', width=1), name='Solar (mA)')
+        self.curve_i_grid = self.p4.plot(pen=pg.mkPen('cyan', width=1), name='Xarxa (mA)')
+        self.curve_i_cons = self.p4.plot(pen=pg.mkPen('red', width=1), name='Càrrega 1 (%)') # Changed to %
+        self.curve_i_load2 = self.p4.plot(pen=pg.mkPen('blue', width=1), name='Càrrega 2 (%)') # New curve for load 2
+        self.curve_i_load3 = self.p4.plot(pen=pg.mkPen('green', width=1), name='Càrrega 3 (%)') # New curve for load 3
         self.curve_i_net = self.p4.plot(pen=pg.mkPen('w', style=QtCore.Qt.DashLine), name='I Net (Cap)')
         
         self.graph_win.show()
         
-        self.h = {k: deque(maxlen=200) for k in ['vs','vr','soc','ps','pg','pc','in', 'is', 'ig', 'ic', 'pcp']}
+        self.h = {k: deque(maxlen=200) for k in ['vs','vr','soc','ps','pg','pc','in', 'is', 'ig', 'ic', 'il2', 'il3', 'pcp']}
 
     def _setup_hw_monitor(self):
         # Finestra per a senyals de baix nivell (Pins ESP32)
         self.hw_win = pg.GraphicsLayoutWidget(title="Monitorització de l'ESP32")
-        self.hw_win.resize(400, 900)
-        
-        # DAC 25 (Solar)
-        self.p_dac25 = self.hw_win.addPlot(title="Pin 25: DAC Solar (V)")
-        self.p_dac25.setYRange(0, 3.3)
-        self.p_dac25.addLegend()
-        self.curve_dac25 = self.p_dac25.plot(pen='orange', name="Ordre (DAC)")
-        self.curve_adc35 = self.p_dac25.plot(pen='m', name="Mesura (ADC35)")
-        
-        self.hw_win.nextRow()
-        
-        # DAC 26 (VBus Simulat)
-        self.p_dac26 = self.hw_win.addPlot(title="Pin 26: DAC VBus Sim (V)")
-        self.p_dac26.setYRange(0, 3.3)
-        self.curve_dac26 = self.p_dac26.plot(pen='y')
-        
-        self.hw_win.nextRow()
-        
-        # ADC 34 (Llegit de Pin 26)
-        self.p_adc34 = self.hw_win.addPlot(title="Pin 34: ADC Lectura Bus (V)")
-        self.p_adc34.setYRange(0, 3.3)
-        self.p_adc34.addLegend()
-        self.curve_adc34 = self.p_adc34.plot(pen='m', name="Llegit (ADC)")
-        # Afegim la referència teòrica enviada
-        self.curve_vsim_hw = self.p_adc34.plot(pen=pg.mkPen('w', style=QtCore.Qt.DashLine), name="Teòric (Sim)")
+        self.hw_win.resize(500, 1000)
+
+        # Plot 1: Solar System (DAC 25 & ADC 35)
+        self.p_solar_hw = self.hw_win.addPlot(title="Solar: Pin 25 (DAC) vs Pin 35 (ADC)")
+        self.p_solar_hw.setYRange(0, 3.3)
+        self.p_solar_hw.addLegend()
+        self.curve_d25 = self.p_solar_hw.plot(pen='orange', name="DAC 25")
+        self.curve_a35 = self.p_solar_hw.plot(pen='m', name="ADC 35")
 
         self.hw_win.nextRow()
 
-        # Pin 27 (PWM Xarxa)
-        self.p_pwm27 = self.hw_win.addPlot(title="Pin 27: PWM Xarxa (Status)")
-        self.p_pwm27.setYRange(0, 3.3)
-        self.p_pwm27.addLegend()
-        self.curve_pwm27 = self.p_pwm27.plot(pen='cyan', name="Ordre (PWM)")
-        self.curve_adc32 = self.p_pwm27.plot(pen='m', name="Mesura (ADC32)")
+        # Plot 2: Grid System (DAC 26 & ADC 32)
+        title_26 = "Grid: Pin 26 (DAC) vs Pin 32 (ADC)"
+        self.p_grid_hw = self.hw_win.addPlot(title=title_26)
+        self.p_grid_hw.setYRange(0, 3.3)
+        self.p_grid_hw.addLegend()
+        self.curve_d26 = self.p_grid_hw.plot(pen='cyan', name="DAC 26")
+        self.curve_a32 = self.p_grid_hw.plot(pen='m', name="ADC 32")
+
+        self.hw_win.nextRow()
+
+        # Plot 3: DC Bus (ADC 34)
+        self.p_bus_hw = self.hw_win.addPlot(title="DC Bus: Pin 34 (ADC)")
+        self.p_bus_hw.setYRange(0, 3.3)
+        self.p_bus_hw.addLegend()
+        self.curve_a34 = self.p_bus_hw.plot(pen='y', name="ADC 34")
+
+        self.hw_win.nextRow()
+
+        # Plot 4: Loads PWM Effective Voltage (Pins 2, 5, 4)
+        self.p_loads_hw = self.hw_win.addPlot(title="Loads PWM (Effective V): Pins 2, 5, 4")
+        self.p_loads_hw.setYRange(0, 3.3)
+        self.p_loads_hw.addLegend()
+        self.curve_p2 = self.p_loads_hw.plot(pen='red', name="Pin 2 (R)")
+        self.curve_p5 = self.p_loads_hw.plot(pen='green', name="Pin 5 (G)")
+        self.curve_p4 = self.p_loads_hw.plot(pen='blue', name="Pin 4 (B)")
 
         self.hw_win.show()
-        self.hw_h = {k: deque(maxlen=200) for k in ['d25', 'd26', 'a34', 'vsim', 'p27', 'a35', 'a32']}
+        # History buffers for low-level signals
+        self.hw_h = {k: deque(maxlen=200) for k in [
+            'd25', 'a35', # Solar
+            'd26', 'a32', # Grid
+            'a34',        # Bus
+            'p2', 'p5', 'p4' # Loads
+        ]}
 
     def _enable_controls(self):
         self.verticalSlider_2.setEnabled(True)
@@ -146,16 +166,15 @@ class GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         p_cap = i_net * v
 
         # Càlcul de corrents individuals per als LCDs (Power / Voltage)
+        # Les càrregues ara representen el Duty Cycle (%) enviat als LEDs
         inputs = self.get_inputs()
-        i_loads = []
-        for i in range(3):
-            if data['served'][i]:
-                p_load = inputs['cons_sliders'][i] * 5
-                i_loads.append(p_load / max(v, 1.0))
-            else:
-                i_loads.append(0.0)
+        i_loads = [inputs['cons_sliders'][i] if data['served'][i] else 0.0 for i in range(3)]
 
-        # 1. Secció de Potències (W)
+        # Seguretat Dummy Load: Si V > 45V, el LED Verd (index 2) està al 100%
+        if v > 45.0:
+            i_loads[2] = 100.0
+
+        # 1. Secció de Potències (W) - No changes here
         self.lcdNumber_6.display(int(p_solar))
         self.lcdNumber_7.display(int(p_grid))
         self.lcdNumber_9.display(int(p_solar + p_grid)) # Potència Disponible
@@ -166,19 +185,28 @@ class GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         self.lcdNumber_8.display(float(f"{v:.2f}"))
         self.lcdNumber_11.display(int(soc))
 
-        # 3. Corrents de càrrega (A)
+        # 3. Duty Cycle Càrrega (%)
         self.lcdNumber_1.display(float(f"{i_loads[0]:.1f}"))
         self.lcdNumber_2.display(float(f"{i_loads[1]:.1f}"))
         self.lcdNumber_3.display(float(f"{i_loads[2]:.1f}"))
 
-        # 4. Esquema (Corrents A i Voltatge V)
+        # 4. Esquema (Corrents A, Voltatge V i Duty Cycle %)
         self.lcdNumber.display(float(f"{p_solar/max(v,1.0):.1f}"))  # I Solar
         self.lcdNumber_4.display(float(f"{p_grid/max(v,1.0):.1f}"))   # I Xarxa
         self.lcdNumber_5.display(float(f"{v:.2f}"))                 # V Bus
         self.lcdNumber_12.display(float(f"{i_net:.1f}"))             # I Net (Cap)
-        self.lcdNumber_13.display(float(f"{i_loads[0]:.1f}"))        # I Càrrega 1
-        self.lcdNumber_14.display(float(f"{i_loads[1]:.1f}"))        # I Càrrega 2
-        self.lcdNumber_15.display(float(f"{i_loads[2]:.1f}"))        # I Càrrega 3
+        self.lcdNumber_13.display(float(f"{i_loads[0]:.1f}"))        # Duty Cycle Càrrega 1 (%)
+        self.lcdNumber_14.display(float(f"{i_loads[1]:.1f}"))        # Duty Cycle Càrrega 2 (%)
+        self.lcdNumber_15.display(float(f"{i_loads[2]:.1f}"))        # Duty Cycle Càrrega 3 (%)
+
+        # Actualitzar indicadors visuals (LEDs Checkboxes)
+        self.checkBox.setChecked(i_loads[0] > 0)     # Roig
+        self.checkBox_3.setChecked(i_loads[1] > 0)   # Blau
+        self.checkBox_2.setChecked(i_loads[2] > 0)   # Verd
+        
+        self.checkBox_7.setChecked(i_loads[0] > 0)   # Roig (Esquema)
+        self.checkBox_8.setChecked(i_loads[1] > 0)   # Blau (Esquema)
+        self.checkBox_9.setChecked(i_loads[2] > 0)   # Verd (Esquema)
 
         # Actualitzar Històrics
         self.h['vs'].append(sim_state['v_bus'])
@@ -191,10 +219,12 @@ class GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         self.h['in'].append(-sim_state['i_net'])
         # Potència del condensador: negativa si absorbeix (carrega), positiva si entrega
         self.h['pcp'].append(-p_cap)
-        
+        # Keep Solar and Grid as current (A)
         self.h['is'].append(data['p_solar'] / max(sim_state['v_bus'], 10))
         self.h['ig'].append(data['p_grid'] / max(sim_state['v_bus'], 10))
-        self.h['ic'].append(-data['p_cons'] / max(sim_state['v_bus'], 10))
+        self.h['ic'].append(i_loads[0])   # Duty Cycle Roig (%)
+        self.h['il2'].append(i_loads[1])  # Duty Blau (%)
+        self.h['il3'].append(i_loads[2])  # Duty Verd (%)
 
         # Actualitzar Gràfics
         self.curve_vbus.setData(list(self.h['vs']))
@@ -206,33 +236,38 @@ class GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         
         self.curve_i_sol.setData(list(self.h['is']))
         self.curve_i_grid.setData(list(self.h['ig']))
-        self.curve_i_cons.setData(list(self.h['ic']))
+        self.curve_i_cons.setData(list(self.h['ic'])) # Plot duty cycle for load 1
+        self.curve_i_load2.setData(list(self.h['il2']))
+        self.curve_i_load3.setData(list(self.h['il3']))
         self.curve_i_net.setData(list(self.h['in']))
 
         # Actualitzar Gràfics Hardware (Scalant a 0-3.3V)
         if self.show_hw:
             v_d25 = (data['dac_pv'] / 255) * 3.3
-            v_d26 = (data.get('v_sim_scaled', 0) / 255) * 3.3
-            v_a34 = (data.get('adc_raw', 0) / 4095) * 3.3
             v_a35 = (data.get('adc_pv_raw', 0) / 4095) * 3.3
+            v_d26 = (data.get('dac_grid_val', 0) / 255) * 3.3
             v_a32 = (data.get('adc_grid_raw', 0) / 4095) * 3.3
-            v_p27 = (data['dac_grid'] / 255) * 3.3
+            v_a34 = (data.get('adc_raw', 0) / 4095) * 3.3
+            
+            loads = data.get('hw_loads', {'r':0, 'g':0, 'b':0})
 
             self.hw_h['d25'].append(v_d25)
-            self.hw_h['d26'].append(v_d26)
-            self.hw_h['a34'].append(v_a34)
             self.hw_h['a35'].append(v_a35)
+            self.hw_h['d26'].append(v_d26)
             self.hw_h['a32'].append(v_a32)
-            self.hw_h['vsim'].append(v_d26) # La referència és el propi DAC26
-            self.hw_h['p27'].append(v_p27)
+            self.hw_h['a34'].append(v_a34)
+            self.hw_h['p2'].append((loads['r']/255)*3.3)
+            self.hw_h['p5'].append((loads['g']/255)*3.3)
+            self.hw_h['p4'].append((loads['b']/255)*3.3)
 
-            self.curve_dac25.setData(list(self.hw_h['d25']))
-            self.curve_adc35.setData(list(self.hw_h['a35']))
-            self.curve_dac26.setData(list(self.hw_h['d26']))
-            self.curve_adc34.setData(list(self.hw_h['a34']))
-            self.curve_vsim_hw.setData(list(self.hw_h['vsim']))
-            self.curve_pwm27.setData(list(self.hw_h['p27']))
-            self.curve_adc32.setData(list(self.hw_h['a32']))
+            self.curve_d25.setData(list(self.hw_h['d25']))
+            self.curve_a35.setData(list(self.hw_h['a35']))
+            self.curve_d26.setData(list(self.hw_h['d26']))
+            self.curve_a32.setData(list(self.hw_h['a32']))
+            self.curve_a34.setData(list(self.hw_h['a34']))
+            self.curve_p2.setData(list(self.hw_h['p2']))
+            self.curve_p5.setData(list(self.hw_h['p5']))
+            self.curve_p4.setData(list(self.hw_h['p4']))
 
     def close_all(self):
         self.graph_win.close()

@@ -1056,7 +1056,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>CONSUM (A):</string>
+      <string>CONSUM (mA):</string>
      </property>
     </widget>
     <widget class="QCheckBox" name="checkBox">

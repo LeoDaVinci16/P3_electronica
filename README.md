@@ -1,80 +1,56 @@
-# Sistema SCADA de Control de Micro-xarxa (Simulació + Hardware)
+# SCADA Micro-xarxa: LED Load Control Documentation
 
-Aquest projecte implementa un sistema de gestió energètica per a una micro-xarxa DC, combinant un motor de simulació física amb una implementació real mitjançant un microcontrolador ESP32. El sistema permet monitoritzar el balanç de potències, gestionar càrregues crítiques i controlar l'emmagatzematge d'energia.
+This project implements a Micro-grid SCADA system where physical LEDs are used to represent electrical loads (Red: Critical, Blue/Green: Non-critical). The LEDs are controlled via PWM through transistors connected to the physical DC bus.
 
-## 📂 Estructura de Fitxers
+## Hardware Configuration
 
-```text
-P3/
-├── main.py              # Orquestrador per a l'ús amb Hardware Real al laboratori.
-├── simulation.py        # Orquestrador per a Simulació Pura (100% Software).
-├── hybrid.py            # Orquestrador Hardware-in-the-Loop (HIL) per a l'ESP32.
-├── brain.py             # Cervell: Lògica de control, Shedding i presa de decisions.
-├── gui.py               # Interfície gràfica PyQt5 i monitorització de hardware.
-├── control_esp32.py     # Driver de comunicació sèrie (DAC/PWM/ADC) per al PC.
-├── ui.py                # Classe d'interfície generada (QtDesigner).
-├── irradiancia.csv      # Dades d'irradiància solar de Barcelona (PVGiS).
-└── uControl_0.py        # Firmware MicroPython per a l'ESP32 (amb oversampling).
-```
+### ESP32 Pin Mapping
+| Load Color | Load Priority | ESP32 Pin | Control Signal |
+| :--- | :--- | :--- | :--- |
+| **Red** | Critical | Pin 2 | PWM (1kHz) |
+| **Blue** | Variable (Shed @ 36V) | Pin 4 | PWM (1kHz) |
+| **Green** | Variable + Safety Sink | Pin 5 | PWM (1kHz) |
 
-## ⚡ Especificacions de la Micro-xarxa
+### Electronic Interface
+Because the LEDs are powered by the hardware DC bus (which can vary between 0-50V), they are connected via transistors (acting as low-side switches). The ESP32 PWM pins drive the base/gate of the transistors to control the effective brightness (power consumption) of each load.
 
-El sistema simula i controla un bus de corrent continu amb els següents paràmetres:
+## Software Control Flow
 
-*   **Tensió Nominal del Bus:** 40 V.
-*   **Tensió Màxima de Seguretat:** 50 V (Límit físic del condensador).
-*   **Emmagatzematge:** Condensador de 12.000 µF (12 mF).
-*   **Generació FV:** Basada en dades reals del PVGiS (Barcelona), escalada a 1000W pic.
-*   **Suport de Xarxa:** Font d'importació (només consum) de fins a 2550W.
-*   **Càrregues:** 
-    *   **Càrrega 1 (Roig):** Crítica.
-    *   **Càrrega 2 (Blau) i 3 (Verd):** No crítiques (gestionades per Load Shedding).
+The control of these LEDs follows a five-step process:
 
-### Dimensionament del Sistema
-El sistema està dissenyat per a potències d'uns **2.5 kW**. La capacitat de **12 mF** s'ha modelat amb un comportament exponencial (incloent una resistència de pèrdues de 200Ω) per simular la realitat física. El SoC es calcula linealment: **0V = 0%** i **50V = 100%**.
+1.  **User Input (GUI):** The user adjusts the horizontal sliders in the "Potència de sortida" section of the SCADA. These sliders provide a percentage value (0 to 100%).
+2.  **Logic Processing (Brain):** The `brain.py` module evaluates the system state (Bus Voltage). If the voltage drops below safe thresholds (e.g., 30V), it performs "Load Shedding," marking non-critical loads (Blue/Green) as unserved (`served = False`).
+3.  **Scaling (Main):** In `main.py`, the percentage from the slider is converted to an 8-bit integer (0-255) for serial transmission. If a load has been shed by the Brain, its PWM value is forced to 0.
+    *   `pwm_r = int(slider_val * 2.55) if served else 0`
+4.  **Communication (Serial):** The `control_esp32.py` module sends specific character-prefixed commands over the serial port:
+    *   `R` for Red, `L` for bLue, `G` for Green.
+5.  **Firmware Execution (ESP32):** The `uControl_0.py` firmware receives the 8-bit value, scales it to the ESP32's 10-bit PWM resolution (0-1023), and updates the duty cycle.
+    *   `led.duty(val * 4)`
 
-## 🧠 Lògica de Control (brain.py)
+## GUI Monitoring
 
-### 1. Gestió de Càrregues (Load Shedding)
-Si $V_{bus} < 30V$, el sistema força la desconnexió de les càrregues **Blava i Verda** i posa els seus lliscadors a 0.
+The GUI has been updated to reflect this hardware setup:
+*   **Units:** Labels and LCDs show consumption in **% (Duty Cycle)** rather than Amperes.
+*   **Visual Feedback:** The "Esquema" (Schematic) section displays the real-time duty cycle being applied to each physical LED.
+*   **Historical Data:** The power balance graphs plot the duty cycle history to visualize load shedding events alongside solar and grid power.
 
-### 2. Suport de Xarxa Elèctrica
-*   **Mode Automàtic:** Si $V_{bus} < 30V$ i la càrrega roja està encesa, s'activa un control proporcional ($K_p=100$) per mantenir la tensió.
-*   **Protecció per Sobretensió:** Si $V_{bus} > 35V$, la xarxa es desconnecta forçadament (slider a 0) per evitar sobrecarregar el condensador.
+## How to Run
 
-## 🖥️ Funcionament de l'SCADA (GUI)
+1.  Connect the ESP32 via USB.
+2.  Ensure the LEDs are correctly wired to Pins 2, 4, and 5 through transistors.
+3.  Flash `uControl_0.py` to the ESP32.
+4.  Run `main.py` on your PC:
+    ```bash
+    python main.py
+    ```
 
-*   **Balanç de Potències:** Convenció de signes on fonts (Solar/Xarxa) són positives i receptors (Consum/Càrrega Condensador) són negatius. La suma visual a la línia de zero valida la Llei de Kirchhoff.
-*   **Data i Temps:** Sincronitzat amb el fitxer d'irradiància; mostra la durada de la prova i la data real de 2023.
-*   **Monitor ESP32:** Gràfiques en volts (0-3.3V) per depurar DACs i ADCs.
+## Safety Features
+*   **Overvoltage Protection:** If the bus voltage exceeds 45V, the Photovoltaic (PV) injection is automatically cut off.
+*   **Safety Dummy Load:** If the bus exceeds 45V, the **Green LED** is forced to 100% duty cycle to act as an energy sink, even if its slider is at 0 or it was previously shed.
+*   **Grid Support:** If the critical load is active and the bus voltage drops, the system automatically requests power from the grid to maintain stability.
 
-## 🚀 Execució
-
-### 1. Mode Simulació Pura (`simulation.py`)
-Simulació numèrica d'Euler amb oversampling i filtratge de pèrdues. No requereix hardware.
-```bash
-python simulation.py
-```
-
-### Mode Hardware Real
-Per utilitzar al laboratori amb el condensador real i l'ESP32.
-
-1.  Carrega `uControl_0.py` a l'ESP32 (MicroPython).
-2.  Connecta el Pin 25 (DAC Solar) i el Pin 26 (DAC Xarxa) al circuit de control.
-3.  Connecta el Pin 34 (ADC) al divisor de tensió del bus.
-4.  Executa a l'ordinador:
-
-```bash
-python main.py
-```
-
-## 🛠️ Requisits
-
-*   Python 3.x
-*   PyQt5
-*   PyQtGraph
-*   PySerial (per al mode hardware)
-*   Pandas (per processar el CSV d'irradiància)
-
----
-*Projecte realitzat per Guillem Castillo i Arnau Coronado.*
+## PWM vs Visualization Clarification
+Physical PWM signals on Pins 2, 4, and 5 are **binary switching signals** (0V or 3.3V). The SCADA system:
+1.  **Controls the Duty Cycle:** The sliders (0-100%) define how long the signal stays at 3.3V within each 1ms cycle (1kHz).
+2.  **Visualizes Effective Voltage:** The Hardware Monitor plots show a value between 0V and 3.3V. This represents the **average voltage** (e.g., 50% duty cycle = 1.65V). 
+3.  **Sampling Frequency:** Since the UI updates every 50ms, it is impossible to show individual 1ms pulses. Instead, we display the "commanded duty cycle" to represent the power level sent to the LEDs.
