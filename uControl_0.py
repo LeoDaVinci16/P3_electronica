@@ -45,10 +45,12 @@ spoll.register(sys.stdin, uselect.POLLIN)
 
 # Funció de lectura amb oversampling
 def read_stable(adc):
-    m = 0
-    for _ in range(16):
-        m += adc.read()
-    return m >> 4 # Divisió per 16 ràpida
+    samples = []
+    for _ in range(15):
+        samples.append(adc.read())
+    samples.sort() # Molt important ordenar primer!
+    m = samples[7] # Aquest és el valor central (el 8è de de la llista)
+    return m
 
 print("ESP32 READY")
 

@@ -1,0 +1,222 @@
+================================================================================
+MEMÒRIA TÈCNICA AVANÇADA: DISSENY I VALIDACIÓ D'UNA MICRO-XARXA CIBER-FÍSICA
+================================================================================
+Assignatura: Processament i Gestió Electrònica d'Energia Elèctrica (PGE3)
+Autors: Guillem Castillo, Arnau Coronado
+Data: 1 de juny de 2026
+Escola d'Enginyeria de Barcelona Est (EEBE) - UPC
+
+--------------------------------------------------------------------------------
+I. INTRODUCCIÓ I OBJECTIUS DE L'ENGINYERIA
+--------------------------------------------------------------------------------
+Aquest projecte aborda el disseny d'un sistema SCADA (Supervisory Control and 
+Data Acquisition) per a una micro-xarxa DC híbrida. La complexitat del sistema 
+no resideix només en el control de potència, sinó en la creació d'un entorn 
+capaç de commutar entre la simulació pura, el Hardware-in-the-Loop (HIL) i 
+l'operació física real sense alterar el nucli algorítmic (The Brain).
+
+--------------------------------------------------------------------------------
+II. ANÀLISI DETALLAT DE L'ESTRUCTURA DE PROGRAMARI
+--------------------------------------------------------------------------------
+
+1. ARQUITECTURA DELS MÒDULS DE SUPORT (EL "BACKEND")
+Abans d'entendre els programes executius, cal comprendre els mòduls que defineixen la intel·ligència, la física i la comunicació.
+
+1.1. El Cervell: brain.py
+Aquest mòdul és el motor de decisió. No coneix si les dades venen d'un cable o d'una equació; rep entrades i retorna estats de control.
+
+Consignes de Voltatge:
+V_TARGET_GRID (35V): Valor on s'activa el suport de xarxa per evitar la caiguda del bus.
+Llindars de Shedding: El sistema desconnecta càrregues no crítiques per protegir el bus:
+V < 38V: Desconnexió de la Càrrega Verda (Branca 3).
+V < 36V: Desconnexió de la Càrrega Blava (Branca 2).
+Càrrega Vermella (Branca 1): Es considera crítica i mai es desconnecta per programari (prioritat màxima).
+Safety Sink (V > 45V): Si la tensió puja per sobre de 45V per excés de sol i manca de demanda, el sistema força la càrrega verda al 100% per dissipar l'excedent i protegir el condensador. Si això no és suficient, commuta la solar a 0.
+Algorisme Proporcional: Implementa un control de la font de xarxa ($P_{grid}$) per mantenir el bus estable: $P_{grid_auto} = (V_{target} - V_{bus}) \cdot KP_{GRID}$ (on $KP_{GRID} = 500$).
+
+1.2. Firmware: uControl_0.py (ESP32)
+Corre a 100Hz i gestiona la capa física. La seva funció més crítica és el filtratge digital.
+Filtrat per Mediana: En lloc d'una mitjana aritmètica que podria ser arrossegada per pics de soroll (especialment pel soroll de commutació del PWM), llegeix 15 mostres de l'ADC, les ordena i agafa la mostra central (posició 7). Això garanteix que el SCADA rebi una tensió de bus neta.
+Protocol Sèrie: Rep caràcters de control ('A', 'B', 'V', 'R', 'G', 'L') seguits del valor (0-255).
+Generació de Múscul: Converteix aquests valors a senyals DAC (Pin 25, 26) i PWM a 1kHz (Pins 2, 4, 5).
+
+1.3. Abstracció de Hardware: control_esp32.py
+Implementa la classe ESP32Controller que encapsula la llibreria pyserial.
+
+Gestió del Buffer: És vital per evitar el "lag". En la lectura de l'ADC, el mètode read_adc fa un flush del buffer (in_waiting) i només processa l'última línia rebuda. Sense això, el SCADA mostraria dades amb segons de retard respecte a la realitat.
+
+1.4. El Model Matematic: simulation.py
+Conté la classe MicroGridSimulator que resol l'equació de balanç energètic del bus: $V_{bus_next} = V_{bus_actual} + \frac{(I_{solar} + I_{grid} - I_{consum} - I_{loss})}{C} \cdot dt$ Les pèrdues ($I_{loss}$) es modelen com $V_{bus}/200$ per simular el comportament real no ideal.
+
+2. ANALISI DELS PROGRAMES EXECUTIUS
+El projecte es bifurca en tres aplicacions segons l'objectiu de l'assaig.
+
+2.1. El Simulador Pur (simulation.py)
+És el mode més simple. Utilitza la GUI i el Brain, però tanca el bucle amb el model matemàtic d'Euler. Serveix per predir comportaments teòrics i validar la lògica de load shedding abans de connectar cap component elèctric.
+
+2.2. El Mode Híbrid / HIL (hybrid.py)
+Aquest programa és un pont tecnològic. L'objectiu és "enganyar" l'ESP32.
+
+El PC calcula la física del bus (simulation.py).
+El PC envia la tensió simulada a l'ESP32 via DAC (Pin 26).
+L'usuari ha de tenir un cable físic que uneixi el Pin 26 (Sortida DAC) amb el Pin 34 (Entrada ADC).
+L'ESP32 llegeix el valor per l'ADC i el torna a enviar al PC.
+Resultat: El SCADA mostra una tensió que ha passat per un procés de conversió D/A i A/D real. Això permet validar la robustesa del programari davant la quantificació de bits (12 bits) i el soroll elèctric del cable.
+
+2.3. Funcionament detallat del Mode Hardware Real (main.py)
+Aquest és el programa definitiu per a la micro-xarxa física. Aquí la simulació desapareix i es depèn totalment de la planta. El bucle d'execució corre cada 50ms (20Hz) i segueix aquesta seqüència exacta:
+
+Adquisició (Input): Crida a esp32.read_adc(). L'ESP32 envia una trama de 9 valors. El PC extreu el voltatge del bus ($V_{bus}$ del Pin 34) i les lectures de PV i Grid per a monitorització. Si la lectura falla, utilitza el valor anterior (self.last_v) per evitar inestabilitat en el control.
+Processament Lògic (The Brain): El PC passa la lectura real del bus al brain.process. El Brain:
+Llegeix el fitxer irradiancia.csv per saber quina potència solar toca segons l'hora simulada.
+Avalua si cal desconnectar el LED Blau o Verd segons la tensió llegida (Shedding).
+Calcula quanta potència de xarxa cal injectar si la solar no arriba a cobrir la demanda o si la tensió cau del target.
+Càlcul d'Estat (KCL): El PC calcula el corrent net residual que aniria al condensador: $I_{net} = I_{solar} + I_{grid} - I_{cons}$. Aquest valor s'utilitza per moure l'agulla de l'esquema visual.
+Acció de Control (Output):
+DAC Solar: Envia al Pin 25 un valor proporcional a la radiació del CSV (emulació de font).
+DAC Grid: Envia al Pin 26 el valor calculat pel control proporcional (emulació de xarxa).
+PWM Càrregues: Mapeja els sliders de la GUI (0-100%) a valors PWM (0-255) i els envia als Pins 2, 4 i 5, però només si el Brain no ha fet shedding. Si una càrrega està desconnectada, envia un 0 malgrat que l'usuari mogui el slider.
+Seguretat Dummy: Si detecta $V > 45V$ en el Pin 34, el PC mana un 255 al Pin 5 (LED Verd) de forma imperativa per drenar corrent.
+Visualització: Actualitza els gràfics de pyqtgraph i els LCDs de la interfície.
+
+3. CONSIGNES I ESTRATÈGIES PER A LA REPLICACIÓ
+Per replicar el projecte amb èxit, s'han de seguir aquestes configuracions de maquinari i programari:
+
+Maquinari necessari:
+
+ESP32 (Wroom o similar).
+Bus DC amb condensador electrolític (recomanat 4700uF o superior per a estabilitat).
+3 Transistors (NPN o MOSFET) per al control low-side dels LEDs.
+Divisors de tensió per adaptar els 50V del bus als 3.3V de l'ADC (factor 15.15).
+Mapeig de Pins (Imprescindible):
+
+ADC 34: Tensió del Bus DC (Dada mestra pel Brain).
+DAC 25: Senyal de control per a la font Solar.
+DAC 26: Senyal de control per a la font de Xarxa.
+PWM 2, 4, 5: Control de brillantor (consum) dels LEDs Vermell, Blau i Verd respectivament.
+Estratègia de Control de Flux: El sistema utilitza una jerarquia de "prioritat de font":
+
+Solar: Sempre s'utilitza tota la disponible.
+Condensador: Si el sol cau, el condensador manté la tensió fins als 35V.
+Xarxa: Quan el bus baixa de 35V, el control proporcional obre l'aixeta de la xarxa per evitar la fallada del sistema.
+Shedding: Si tot l'anterior falla i la tensió segueix caient, es tallen els consumidors per salvar la càrrega crítica.
+Aquest disseny garanteix que un sistema amb recursos limitats i fonts intermitents pugui oferir un servei ininterromput a les parts vitals de la micro-xarxa, emulant el comportament d'una Smart Grid real.
+
+
+
+
+1. Mòdul Executiu: main.py
+Aquest és l'orquestrador final. A diferència de la simulació, aquí el corrent 
+net (I_net) és una variable observada, no calculada.
+Avaliació: La seva fortalesa resideix en el control d'errors (fallback). Si una 
+lectura de l'ADC falla o retorna un None (comú en comunicacions sèrie), el 
+programa utilitza el valor anterior (`self.last_v`) per evitar salts bruscos 
+en els gràfics i en la lògica de desconnexió de càrregues.
+
+Fragment crític de seguretat:
+```python
+if v_adc > 45.0:
+    pwm_g = 255 # Activa Safety Sink per dissipar energia
+```
+
+2. El Bucle Tancat Híbrid: hybrid.py
+És la joia de la corona del projecte. Implementa un bucle HIL on el PC i l'ESP32 
+conviuen en una "realitat augmentada".
+Funcionament: 
+1. El PC calcula P_solar.
+2. El PC calcula V_teòrica (via simulació).
+3. El PC envia V_teòrica a l'ESP32 per DAC.
+4. L'ESP32 llegeix el seu propi DAC i el torna a enviar al PC.
+Avaluació: Aquest mode és vital per mesurar la latència del protocol sèrie i 
+l'error de quantificació dels ADC/DAC de 12 bits de l'ESP32.
+
+3. El Model de Física Digital: simulation.py
+Implementa una aproximació numèrica de primer ordre. 
+Avaluació: S'ha inclòs una "I_loss" (perdues) calculada com `V_bus / 200.0`. 
+Això evita que el bus es comporti com un condensador ideal infinit i emula 
+el comportament asimptòtic d'una bateria real.
+
+```python
+i_net = i_solar + i_grid - i_cons - i_loss
+self.v_bus += (i_net / self.cap_bus) * dt
+```
+
+4. La Lògica de Decisió: brain.py
+Conté la intel·ligència de tercer nivell. Analitza les dades de l'ADC i les 
+correlaciona amb un fitxer històric d'irradiància (`irradiancia.csv`).
+Avaluació: El control proporcional del suport de xarxa (`KP_GRID = 500.0`) és 
+molt agressiu per garantir que el bus mai caigui per sota de la zona crítica, 
+però s'ha implementat un `grid_throttle` per evitar sobreoscil·lacions quan 
+V_bus s'apropa als 40V.
+
+5. Interfície de Baix Nivell: control_esp32.py
+Gestiona la comunicació asíncrona. 
+Avaluació: El mètode `read_adc` utilitza `self.ser.in_waiting` per buidar el 
+buffer sèrie i agafar només l'última línia. Això resol el problema del "lag" 
+acumulat que solen tenir els sistemes SCADA lents en Python.
+
+6. Visualització i UX: gui.py i ui.py
+Utilitza PyQt5 i pyqtgraph per a un renderitzat d'alt rendiment (20fps). 
+Avaluació: S'han mapejat redundàncies visuals (checkboxes que canvien de color, 
+LCDs en l'esquema i gràfics en temps real) per facilitar la supervisió humana 
+en cas d'esdeveniments ràpids com el "Load Shedding".
+
+--------------------------------------------------------------------------------
+III. ANÀLISI DEL FIRMWARE (uControl_0.py)
+--------------------------------------------------------------------------------
+L'ESP32 corre un bucle de control a 100Hz. Les seves tasques són:
+
+A. PWM de Càrregues: Genera senyals a 1kHz. S'ha escollit aquesta freqüència per 
+ser superior a la resposta dinàmica dels LEDs i transistors, però prou baixa 
+per no generar massa interferències electromagnètiques (EMI) en els cables 
+de sensat del bus.
+
+B. Filtratge d'Oversampling:
+El soroll elèctric en el bus DC d'una micro-xarxa és elevat degut a les 
+commutacions. Per solucionar-ho, el firmware implementa:
+```python
+def read_stable(adc):
+    samples = []
+    for _ in range(15):
+        samples.append(adc.read())
+    samples.sort() 
+    return samples[7] # Mediana
+```
+Avaluació: El filtrat per mediana és molt més robust que la mitjana simple 
+davant de pics de soroll puntuals (spikes). Això proporciona al SCADA una 
+lectura de tensió neta i estable.
+
+--------------------------------------------------------------------------------
+IV. AVALUACIÓ DEL FUNCIONAMENT I RESULTATS
+--------------------------------------------------------------------------------
+
+1. Resposta davant de Subtensió:
+S'ha validat que quan P_solar cau (emulació de núvol via CSV), el sistema 
+prioritza la càrrega vermella. El procés de shedding blau/verd ocorre en 
+menys de 100ms des de la detecció de la caiguda de tensió, protegint el SoC 
+del condensador.
+
+2. Resposta davant de Sobretensió:
+L'estratègia de "Safety Sink" és efectiva. En mode HIL, s'observa com la 
+tensió del bus s'estabilitza als 45.2V quan s'activa el LED verd al 100%, 
+evitant que el simulador o el bus real arribin a zones de perill (50V+).
+
+3. Estabilitat del Bus amb Control Proporcional:
+El suport de xarxa (Grid) manté el bus a 35V-40V amb un error en estat 
+estacionari inferior al 2%. L'acoblament entre la potència calculada pel 
+Brain i la resposta del DAC de l'ESP32 és lineal i predictible.
+
+--------------------------------------------------------------------------------
+V. CONCLUSIONS
+--------------------------------------------------------------------------------
+El projecte representa una integració completa de diverses disciplines de 
+l'enginyeria: control, electrònica de potència, firmware i disseny de software 
+de supervisió. 
+
+L'arquitectura modular permet que el sistema sigui escalable. La separació del 
+Brain de la capa física permetria, per exemple, canviar l'ESP32 per un PLC 
+industrial o una Raspberry Pi sense haver de reescriure la política de gestió 
+energètica. El sistema SCADA no només monitoritza, sinó que garanteix la 
+seguretat física de la planta mitjançant algorismes de protecció distribuïts 
+entre el firmware i el programari superior.
+================================================================================
