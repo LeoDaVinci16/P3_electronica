@@ -1,4 +1,4 @@
-\documentclass[twocolumn,11pt,a4paper]{article}
+\documentclass[twocolumn,10.5pt,a4paper]{article}
 
 \usepackage[utf8]{inputenc}
 \usepackage[catalan]{babel}
@@ -36,7 +36,8 @@
     tabsize=2
 }
 
-\title{\fontsize{16pt}{20pt}\selectfont \textbf{Arquitectura SCADA i Control de Tercer Nivell per a una Micro-xarxa DC Híbrida: Una Aproximació Ciber-Física}}
+\title{\fontsize{16pt}{20pt}\selectfont \textbf{Arquitectura SCADA i Control de Tercer Nivell per a una emulació de Micro-xarxa DC Híbrida}}
+
 
 \author{
     Guillem Castillo i Arnau Coronado \\
@@ -51,40 +52,44 @@
 \maketitle
 
 \begin{abstract}
-    Aquest informe documenta el disseny, implementació i validació d'un sistema d'emulació ciber-física per a la gestió de tercer nivell d'una micro-xarxa DC híbrida. El sistema utilitza dades reals d'irradiància de Barcelona (2023) per emular el comportament del bus elèctric, l'emmagatzematge i la gestió de càrregues en un entorn de temps virtual accelerat. Mitjançant la integració d'un ESP32 i una interfície SCADA en Python, es demostra la capacitat del sistema per garantir l'estabilitat del bus a 40V i la continuïtat de càrregues crítiques davant la variabilitat climàtica anual, utilitzant estratègies de \textit{load shedding} i filtratge de senyal digital.
+    Aquest article tècnic detalla el desenvolupament integral d'un sistema SCADA per a la gestió de tercer nivell d'una micro-xarxa híbrida en corrent continu (DC). El sistema emula una infraestructura energètica real composta per generació fotovoltaica (FV), connexió de suport a la xarxa elèctrica, emmagatzematge d'energia mitjançant condensadors de gran capacitat i càrregues controlades (LEDs). L'arquitectura del programa permet la commutació entre simulació pura, \textit{Hardware-in-the-Loop} (HIL) i operació física emulada. La política de control se centra en el manteniment de l'estabilitat del bus al voltant de 40V, aplicant algorismes de \textit{load shedding} robustos i una jerarquia de prioritats en el flux de potència gestionada des d'un microcontrolador ESP32 i una interfície PyQt5.
+
+    \textbf{Paraules clau:} \textit{Micro-xarxa, SCADA, Gestió de Tercer Nivell, ESP32, Filtrat per Mediana, Load Shedding.}
 \end{abstract}
 
 \section{Introducció i Objectius}
-Dins de la jerarquia de control de micro-xarxes, el tercer nivell s'ocupa de la gestió de potències i l'estabilitat a llarg termini del bus, optimitzant el balanç entre generació, demanda i emmagatzematge. L'objectiu d'aquest treball és desenvolupar una plataforma ciber-física funcional que permeti emular i controlar aquests fluxos d'energia.
+El disseny de sistemes energètics intel·ligents requereix una supervisió que vagi més enllà del simple control local de convertidors. Aquest projecte aborda la implementació de la gestió de tercer nivell, la capa superior de la piràmide d'automatització, encarregada d'optimitzar l'estratègia global de la micro-xarxa.
 
-Els reptes tecnològics abordats inclouen:
-\begin{itemize}
-    \item Disseny d'un motor de simulació basat en el mètode d'Euler.
-    \item Implementació de Hardware-in-the-Loop per validar la latència del protocol sèrie.
-    \item Emulació del funcionament anual de la xarxa en temps virtual accelerat.
-    \item Estabilització del bus a 40V mitjançant control proporcional de la xarxa elèctrica.
-\end{itemize}
+L'objectiu principal és implementar un entorn capaç de gestionar el balanç energètic entre fonts de generació intermitent i càrregues de diferent criticitat. La complexitat resideix en la integració de components físics amb un model digital en temps real, permetent validar la robustesa de l'estratègia de control. Els reptes tecnològics inclouen el filtratge de senyals en entorns amb soroll de commutació, el control proporcional de la tensió de bus i la gestió eficient del flux de dades.
 
 \section{Arquitectura del Sistema}
-La infraestructura es divideix en components de potència i etapes de control:
-\begin{enumerate}
-    \item \textbf{Generació Emulada:} S'utilitzen les sortides DAC de l'ESP32 per controlar fonts de corrent que emulen panells FV i la xarxa elèctrica.
-    \item \textbf{Emmagatzematge:} Un bus DC amb un condensador de 4700$\mu$F que actua com a memòria d'energia.
-    \item \textbf{Branques de Càrrega:} Tres LEDs controlats per transistors BJT/MOSFET en configuració d'emissor comú.
-\end{enumerate}
-
-\subsection{Mapeig de Pins (ESP32)}
+La maqueta física que es mostra a la figura \ref{fig:planta_fisica} ha estat dissenyada per representar els quatre pilars fonamentals d'una micro-xarxa elèctrica intel·ligent:
 \begin{itemize}
-    \item \textbf{ADC 34 (Bus):} Entrada crítica que alimenta la lògica del \textit{Brain}.
-    \item \textbf{DAC 25/26:} Control de generació. En mode HIL, el DAC 26 injecta el voltatge simulat.
-    \item \textbf{PWM 2, 4, 5:} Control de \textit{duty cycle} (0-255) per a les càrregues Roig, Blau i Verd.
+    \item \textbf{Generació:} Dues fonts de corrent controlades per tensió que emulen la producció fotovoltaica (FV) i el suport de la xarxa elèctrica.
+    \item \textbf{Emmagatzematge:} Un condensador electrolític de gran capacitat (12 mF) que actua com a pulmó energètic del bus DC.
+    \item \textbf{Càrregues:} Tres branques LED de diferent prioritat (Vermell, Blau, Verd).
+    \item \textbf{Element de Camp:} Un ESP32 encarregat de la digitalització del bus i l'execució de les ordres PWM i DAC.
 \end{itemize}
 
-\section{Ecosistema de Programari}
-La complexitat del projecte resideix en la seva modularitat. Cada script té una responsabilitat única dins del llaç de control de 50ms.
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\linewidth]{planta.png}
+    \caption{Muntatge experimental de la planta física sobre protoboard.}
+    \label{fig:planta_fisica}
+\end{figure}
 
-\subsection{Firmware i Filtrat Digital}
-L'ESP32 no es limita a ser un transceptor de dades. Realitza un preprocessament digital essencial. El soroll induït pel PWM en un bus compartit fa que les lectures ADC siguin inestables. Per solucionar-ho, \texttt{uControl\_0.py} implementa un filtratge per mediana:
+\section{Adquisició i Tractament del Flux de Dades}
+La integritat del control de tercer nivell depèn de la precisió en la captura de dades i de la velocitat de resposta, gestionats a \texttt{control\_esp32.py}. El camí de la informació es detalla a continuació:
+
+\subsection{Mapeig de Pins i Etapa de Potència}
+\begin{itemize}
+    \item \textbf{Entrada (ADC 34):} Llegeix la tensió del bus mitjançant un divisor de tensió (factor 15.15).
+    \item \textbf{Generació (DAC 25/26):} Modulen la potència de les fonts solar i de xarxa respectivament.
+    \item \textbf{Actuació (PWM 2, 4, 5):} Controlen el consum dels LEDs. S'utilitza l'integrat \textbf{ULQ200x}, una matriu Darlington \textit{low-side} que aïlla l'ESP32 i permet gestionar càrregues sobre el bus de 50V amb precisió.
+\end{itemize}
+
+\subsection{Filtre de Mediana (Firmware)}
+Per netejar la dada del soroll de commutació PWM, el firmware de l'ESP32 (\texttt{uControl\_0.py}) implementa un filtre de mediana. El sistema pren 15 mostres de l'ADC, les ordena i selecciona el valor de la \textbf{posició 7}. A diferència d'una mitjana, que es veuria alterada per un sol pic de soroll, la mediana descarta els \textit{spikes} i garanteix una lectura estable per a la lògica de \textit{load shedding}.
 
 \begin{lstlisting}[language=Python]
 def read_stable(adc):
@@ -94,10 +99,9 @@ def read_stable(adc):
     samples.sort()
     return samples[7] 
 \end{lstlisting}
-Aquesta tècnica descarta els valors atípics (*outliers*) produïts pels transitoris de commutació, oferint una mesura de tensió de bus extremadament neta al SCADA.
 
-\subsection{Abstracció de Hardware}
-El mòdul \texttt{control\_esp32.py} resol el problema del retard en Python. Els sistemes SCADA sovint pateixen de \textit{lag} si el buffer sèrie s'omple. La nostra implementació buida el buffer i busca l'última línia completa des del final:
+\subsection{Gestió Asíncrona i Optimització del Buffer}
+Per evitar el \textit{lag} acumulat en les comunicacions sèrie, el PC realitza una \textbf{Gestió Asíncrona del Buffer}. En cada cicle d'execució de 50ms, el programa buida completament el buffer de recepció (\texttt{in\_waiting}) i processa exclusivament l'última línia vàlida. Aquesta optimització assegura que l'estratègia del \texttt{brain.py} reaccioni a temps real, evitant que el sistema prengui decisions basades en estats de bus obsolets.
 
 \begin{lstlisting}[language=Python]
 if self.ser.in_waiting > 0:
@@ -106,56 +110,116 @@ if self.ser.in_waiting > 0:
     latest_line = lines[-1] 
 \end{lstlisting}
 
-\subsection{Model de Física Digital}
-El mòdul \texttt{simulation.py} permet al sistema predir el comportament del bus. Utilitzant les lleis de Kirchhoff i el mètode d'Euler, s'actualitza l'estat del condensador:
-\begin{equation}
-    I_{cond} = I_{solar} + I_{grid} - I_{cons} - I_{loss}
-\end{equation}
-\begin{equation}
-    V_{bus_{k+1}} = V_{bus_k} + \frac{I_{cond}}{C} \cdot \Delta t
-\end{equation}
-S'ha modelat una pèrdua $I_{loss} = V_{bus}/200$ per evitar que el sistema sigui un integrador pur ideal, emulant així les fuites reals de qualsevol sistema d'emmagatzematge.
-
 \section{Modes d'Operació}
-L'habilitat del projecte per commutar entre modes sense canviar el \textit{Brain} és un indicador de bon disseny de programari:
-
+L'arquitectura del programari permet commutar entre tres modes de funcionament sense alterar la lògica de control (\texttt{brain.py}):
 \begin{itemize}
-    \item \textbf{Simulació Pura:} Validació teòrica.
-    \item \textbf{Mode Híbrid (HIL):} \texttt{hybrid.py} tanca el bucle DAC-ADC. És el mode més exigent per al firmware, ja que l'ESP32 ha de digitalitzar un senyal que ell mateix ha generat després d'un processament al PC.
-    \item \textbf{Emulació sobre Planta Física:} \texttt{main.py} s'executa sobre el maquinari real. Les dades ADC (Pin 34) són ara l'única veritat del sistema, eliminant la dependència del simulador per al càlcul de la tensió.
+    \item \textbf{Simulació Pura (\texttt{simulation.py}):} Validació teòrica amb el model matemàtic d'Euler.
+    \item \textbf{Mode Híbrid (HIL) (\texttt{hybrid.py}):} El PC calcula la física però tanca el bucle a través del hardware real (DAC a ADC), validant la latència i la quantificació.
+    \item \textbf{Hardware Real (\texttt{main.py}):} Operació directa sobre la planta física, on l'ADC dicta la realitat del bus.
 \end{itemize}
 
 \section{Estratègies de Control i Emulació Temporal}
 El mòdul \texttt{brain.py} actua com l'òrgan de decisió central, aplicant les següents consignes:
 
-\subsection{Control Proporcional del Grid}
-Per mantenir el bus a la consigna de 40V, s'injecta potència de xarxa de forma proporcional a l'error de tensió:
+\subsection{Manteniment de la tensió de bus}
+La política central és garantir que la tensió del bus no caigui mai dels \textbf{35V}. Com que tots els elements estan acoblats al mateix bus DC, el sistema monitoritza el voltatge real procedent de l'ESP32 i només activa la injecció de corrent de la xarxa quan la suma de la generació solar i l'energia emmagatzemada al condensador no és suficient per equilibrar el balanç de potències.
+
+La prioritat de fonts es gestiona de forma inherent pel balanç de corrents del bus:
 \begin{itemize}
-    \item \textbf{$KP_{GRID} = 500$:} Un guany elevat per a una resposta ràpida.
-    \item \textbf{Grid Throttle:} Una protecció que disminueix la injecció de xarxa si la tensió supera els 40V, evitant sobreoscil·lacions i estalviant energia.
+    \item \textbf{Solar:} Injecta corrent al bus sempre que hi ha irradiància disponible (basat en el document \texttt{irradiancia.csv}), sent la font preferent per cobrir el consum i carregar el condensador.
+    \item \textbf{Condensador:} Actua com a pulmó energètic. Si la generació FV és inferior al consum, el condensador subministra la diferència de corrent de forma natural, provocant una descàrrega i la conseqüent caiguda de tensió del bus.
+    \item \textbf{Xarxa:} El control de tercer nivell només permet la injecció activa de corrent des de la xarxa quan la tensió del bus cau per sota dels 35V, actuant com a darrer recurs per evitar el col·lapse del servei crític.
 \end{itemize}
 
-\subsection{Jerarquia de Prioritats i Load Shedding}
-La micro-xarxa prioritza la continuïtat del servei de la càrrega crítica (Vermella). El \textit{load shedding} actua de forma seqüencial:
+\begin{lstlisting}[language=Python]
+# Suport automatic per mantenir el Bus 
+error_v = self.V_TARGET_GRID - current_vbus
+p_grid_auto = max(0, error_v * self.KP_GRID) if served[0] else 0
+\end{lstlisting}
+
+\subsection{Estratègia de Gestió de Càrregues (Load Shedding)}
+El sistema classifica les càrregues segons la seva criticitat per protegir l'estabilitat del sistema en cas de baixa disponibilitat energètica:
+
+La micro-xarxa prioritza la continuïtat del servei de la càrrega crítica (LED roig), la qual es manté alimentada de forma permanent. El \textit{load shedding} actua de forma seqüencial sobre les càrregues no crítiques:
 \begin{enumerate}
     \item \textbf{Zona Operativa ($>38$V):} Totes les càrregues actives.
-    \item \textbf{Llindar 1 (38V):} Es desconnecta la càrrega Verda.
-    \item \textbf{Llindar 2 (36V):} Es desconnecta la càrrega Blava.
-    \item \textbf{Reserva Crítica:} El LED Vermell només s'apaga si la tensió del bus cau de 30V (límit físic de seguretat).
+    \item \textbf{Desconnexió preventiva:} Les càrregues no crítiques (LED blau i verd) es desconnecten immediatament. L'objectiu és aturar la descàrrega del condensador i prioritzar l'energia restant per a la càrrega crítica.
+          \begin{itemize}
+              \item Llindar 1 (38V): Es desconnecta la càrrega Verda.
+              \item Llindar 2 (36V): Es desconnecta la càrrega Blava.
+          \end{itemize}
+
+          \begin{lstlisting}[language=Python]
+# Sequencia de desconnexio (Load Shedding)
+if current_vbus < 38.0: served[2] = False # Shed Verd
+if current_vbus < 36.0: served[1] = False # Shed Blau
+\end{lstlisting}
+
+    \item \textbf{Reserva Crítica:} Quan es solicita, LED roig es manté connectat de forma ininterrompuda.
 \end{enumerate}
 
+
+
 \subsection{Protecció Avançada: Safety Sink}
-Si la generació solar és màxima i no hi ha consum, la tensió del bus pot pujar ràpidament. A 45V, el \textit{Brain} activa el \textbf{Safety Sink}: força el LED verd al 100\% per drenar energia. Si la tensió persisteix per sobre de 45V, el DAC solar es posa a 0 per tallar la producció.
+Si la generació solar és màxima i no hi ha consum, la tensió del bus pot pujar ràpidament. A 45V, el \texttt{brain.py} activa el \textbf{Safety Sink}: força el LED verd al 100\% per drenar energia. Si la tensió persisteix per sobre de 45V, el DAC solar es posa a 0 per tallar la producció (analogia de desconnectar el camp fotovoltaic).
+
+\begin{lstlisting}[language=Python]
+# Estrategia de dissipacio d'excedents
+if current_vbus > 45.0:
+    served[2] = True      # Forcem dissipacio (LED Verd)
+    p_cons_pot[2] = 500   # 100% Duty Cycle
+    pv_forced_off = True  # Tall de produccio FV
+    p_solar_effective = 0.0 
+\end{lstlisting}
+
 
 \section{Anàlisi i Resultats}
-El resultat principal d'aquest projecte és l'emulació exitosa d'un escenari energètic complex. El sistema no es limita a un control de laboratori, sinó que se sotmet a una \textbf{validació climàtica real}.
+El resultat principal d'aquest projecte és l'emulació exitosa d'un escenari energètic complex. El sistema no es limita a un control de laboratori, sinó que se sotmet a una validació climàtica real a partir de les dades històriques d'irradiància solar a Barcelona (2023).
 
 \subsection{Validació amb Dades Reals i Temps Virtual}
-L'execució del programa \texttt{main.py} processa el fitxer \texttt{irradiancia.csv}, que conté dades horàries reals de Barcelona durant l'any 2023. Atès que el bucle de control s'executa cada 50ms però avança l'índex de dades solars en cada iteració, el sistema opera en un \textbf{temps virtual accelerat}. Això permet observar en pocs minuts com es comportaria la micro-xarxa davant de variacions estacionals, dies ennuvolats o pics de radiació estivals.
+L'execució del programa \texttt{main.py} processa el fitxer \texttt{irradiancia.csv}, que conté dades horàries reals de Barcelona durant l'any 2023. Aquesta lògica implica que cada 50ms de temps real, al sistema passa 1 hora de temps virtual. El factor d'acceleració de l'emulació es calcula mitjançant el quocient entre el pas virtual ($\Delta t_{Virtual} = 3600\text{ s}$) i el pas real del bucle ($\Delta t_{Real} = 0,05\text{ s}$):
+\begin{equation}
+    Factor = \frac{\Delta t_{Virtual}}{\Delta t_{Real}} = \frac{3600\text{ s}}{0,05\text{ s}} = 72.000
+\end{equation}
+Això permet observar en pocs minuts com es comportaria la micro-xarxa davant de variacions estacionals, dies ennuvolats o pics de radiació estivals:
+\begin{itemize}
+    \item 1 segon real equival a 72.000 segons virtuals (aprox. 20 hores).
+    \item Simular un dia sencer (24 hores) triga només 1,2 segons.
+    \item Emular un any sencer (8.760 hores) requereix aproximadament 7,3 minuts de temps real.
+\end{itemize}
 
-Els gràfics de \textit{pyqtgraph} mostren una estabilitat del bus amb un error inferior a l'1\% en mode hardware real. La resposta del \textit{load shedding} és gairebé instantània (50ms), el que garanteix la supervivència de la càrrega roja fins i tot en caigudes sobtades de producció solar emulades.
+\begin{lstlisting}[language=Python]
+# Carrega de dades historiques (brain._load_solar_csv)
+def _load_solar_csv(self):
+    data = []
+    with open('irradiancia.csv', 'r') as f:
+        reader = csv.reader(f)
+        for row in reader:
+            if row and row[0][0].isdigit():
+                data.append((row[0], float(row[1])))
+    return data
+
+# Gestio del temps accelerat (brain.process)
+ts, p_solar = self.solar_data[self.idx]
+self.idx = (self.idx + 1) % len(self.solar_data)
+\end{lstlisting}
+
+\subsection{Interfície SCADA i Monitorització en Temps Real}
+En executar el mòdul \texttt{main.py}, el sistema desplega de forma automàtica una Interfície Gràfica d'Usuari (GUI) definida als fitxers \texttt{gui.py} i \texttt{ui.py}, els quals han estat desenvolupats mitjançant l'eina Qt Designer. L'arquitectura de la interfície s'organitza en dues pantalles principals de visualització i control:
+\begin{itemize}
+    \item Panell de Control SCADA: Aquesta pantalla permet la interacció directa de l'usuari amb la planta. Inclou tres sliders interactius, un per a cada branca LED (roig, blau i verd), que actuen com a sol·licituds de demanda de consum. En desplaçar aquests controls, el sistema tradueix la posició a un senyal PWM que varia de forma lineal des del 0% fins al 100% del cicle de treball, permetent una regulació precisa de la potència consumida per cada càrrega
+    \item Monitorització Gràfica: La segona pantalla integra gràfics dinàmics basats en la llibreria pyqtgraph. Aquests gràfics mostren en temps real l'evolució de la tensió del bus, l'aportació de cada font i els esdeveniments de load shedding, proporcionant una visió clara del balanç de potències i l'estabilitat del sistema sota la política dels 40V.
+\end{itemize}
+
+ESPAI PER POSAR: Captura de pantalla de la pantalla SCADA amb els sliders de control Descripció: Imatge de la interfície on es vegin els controls de demanda i els visualitzadors de duty cycle.
+ESPAI PER POSAR: Captura de pantalla dels gràfics de visualització en temps real Descripció: Gràfics de pyqtgraph mostrant la resposta del bus davant el control dels sliders.
+Aquesta integració entre la gestió de dades històriques i el control físic immediat demostra l'eficàcia del sistema per predir i gestionar el comportament d'una micro-xarxa real en un entorn ciber-físic segur.
+\textbf{[ESPAI PER MOSTRAR EL GUI I LA IRRADIACIÓ]}
+
 
 \section{Conclusions}
-Aquest projecte ha permès dissenyar un banc de proves funcional per a l'emulació de micro-xarxes. S'ha demostrat que la combinació de dades històriques reals i control físic en temps real és una eina poderosa per predir l'eficàcia de polítiques de \textit{load shedding}. La transició cap a un model d'emulació anual posa de manifest que la integritat del sistema depèn no només de l'electrònica de potència, sinó de la intel·ligència del programari per gestionar el balanç energètic en escenaris climàtics canviants.
+Aquest projecte ha permès dissenyar un banc de proves funcional per a l'emulació de micro-xarxes. La separació de la lògica de decisió \texttt{brain.py} de la capa física permet que el sistema sigui altament escalable; per exemple, canviant l'ESP32 per un PLC industrial sense haver de reescriure la política energètica.
+
+L'ús de tècniques avançades com el filtratge per mediana al firmware i la gestió de buffer sèrie al SCADA ha estat clau per obtenir un control estable i sense retards. S'ha demostrat que la combinació de dades històriques reals i control físic en temps real és una eina poderosa per predir l'eficàcia de polítiques de \textit{load shedding}. En definitiva, el projecte aconsegueix integrar de forma eficient el processament de dades, l'electrònica de potència i les estratègies de gestió de xarxes intel·ligents (\textit{Smart Grids}), garantint sempre el subministrament a la càrrega crítica i la seguretat de la instal·lació. L'emulació de la microxarxa ha permès utilitzar estrategies reals en un sistema electrònic segur a molt baixa tensió.
 
 \end{document}

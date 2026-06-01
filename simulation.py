@@ -29,13 +29,13 @@ class StandaloneSim:
         processed = self.brain.process(inputs, None, self.sim.v_bus)
         
         # Actualització del temps i el label
-        self.sim_time_h += 0.05
+        self.sim_time_h += 1.0
         ts = processed['timestamp']
         self.gui.label_date.setText(f"Durada total: {self.sim_time_h:.1f} h \n\nData: {ts[6:8]}/{ts[4:6]}/2023 {ts[9:11]}:00 h")
 
         # Física del simulador
         v, soc, i_s, i_g, i_c, i_n = self.sim.update(
-            processed['p_solar'], processed['p_grid'], processed['p_cons'], 0.05
+            processed['p_solar'], processed['p_grid'], processed['p_cons'], 1.0
         )
         
         sim_res = {'v_bus': v, 'soc': soc, 'i_net': i_n}

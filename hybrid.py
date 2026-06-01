@@ -42,14 +42,14 @@ class HybridApp:
         processed = self.brain.process(inputs, adc_raw, v_adc)
 
         # Update simulation time and display it
-        self.sim_time_h += 0.05 # Each 50ms loop iteration represents 0.05 hours
+        self.sim_time_h += 1.0 # Each loop iteration represents 1 hour from CSV
         ts = processed['timestamp']
         self.gui.label_date.setText(f"Durada total: {self.sim_time_h:.1f} h \n\nData: {ts[6:8]}/{ts[4:6]}/2023 {ts[9:11]}:00 h")
 
         # 3. El simulador calcula la física teòrica segons les potències del Brain
         # (Això genera el senyal que enviarem al Pin 27)
         v_sim, soc, i_s, i_g, i_c, i_n = self.sim.update(
-            processed['p_solar'], processed['p_grid'], processed['p_cons'], 0.05
+            processed['p_solar'], processed['p_grid'], processed['p_cons'], 1.0
         )
 
         # 4. Transposem el Voltatge Simulat (0-50V) a rang DAC/PWM (0-255)

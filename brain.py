@@ -49,16 +49,11 @@ class Brain:
         
         p_grid_manual = grid_slider_pct * 10 * grid_throttle
         
-        # Suport per a la càrrega crítica (Missing Power)
-        # Si la càrrega roja està ON, la xarxa ha de cobrir el que el sol no pot
-        p_cons_red = p_cons_pot[0] if served[0] else 0
-        p_gap_critical = max(0, p_cons_red - p_solar) if served[0] else 0
-        
         # Suport automàtic per voltatge (Proporcional) per mantenir el Bus a 35V
         error_v = self.V_TARGET_GRID - current_vbus
         p_grid_auto = max(0, error_v * self.KP_GRID) if served[0] else 0
             
-        p_grid = p_grid_manual + p_gap_critical + p_grid_auto
+        p_grid = p_grid_manual + p_grid_auto
 
         # 4. Escalar ADC Hardware
         v_bus_real = (adc_raw / 4095.0 * 50.0) if adc_raw is not None else current_vbus

@@ -58,7 +58,7 @@ class MainApp:
         soc_real = max(0.0, min(100.0, (v_bus_real / 50.0) * 100.0))
 
         # Actualització del temps d'execució
-        self.elapsed_time_h += 0.05
+        self.elapsed_time_h += 1.0
         ts = processed['timestamp']
         self.gui.label_date.setText(f"Temps Real: {self.elapsed_time_h:.1f} h \n\nData: {ts[6:8]}/{ts[4:6]}/2023 {ts[9:11]}:00 h")
 
