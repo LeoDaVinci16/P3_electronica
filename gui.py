@@ -12,7 +12,7 @@ class GUI(QtWidgets.QMainWindow, Ui_MainWindow):
 
         # Actualitzem etiquetes per reflectir percentatge (%) en lloc d'Amperis
         self.label_5.setText("CONSUM (%):") # Already updated in previous step
-        self.label_22.setText("%") # Change "Ampers" to "%" in schematic
+        self.label_22.setText("Ampers") # Change back to "Ampers" in schematic
 
         # Configuració de tots els LCDs per mostrar fins a 5 dígits
         lcds = [self.lcdNumber_1, self.lcdNumber_2, self.lcdNumber_3, self.lcdNumber_6, 
@@ -89,11 +89,12 @@ class GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         self.hw_win.resize(500, 1000)
 
         # Plot 1: Solar System (DAC 25 & ADC 35)
-        self.p_solar_hw = self.hw_win.addPlot(title="Solar: Pin 25 (DAC) vs Pin 35 (ADC)")
+        self.p_solar_hw = self.hw_win.addPlot(title="Solar: Pin 25 (DAC)")
         self.p_solar_hw.setYRange(0, 3.3)
+        self.p_solar_hw.setLabel('left', "Voltatge", units='V') 
+        self.p_solar_hw.setLabel('bottom', "Temps", units='h')
         self.p_solar_hw.addLegend()
         self.curve_d25 = self.p_solar_hw.plot(pen='orange', name="DAC 25")
-        self.curve_a35 = self.p_solar_hw.plot(pen='m', name="ADC 35")
 
         self.hw_win.nextRow()
 
@@ -195,9 +196,9 @@ class GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         self.lcdNumber_4.display(float(f"{p_grid/max(v,1.0):.1f}"))   # I Xarxa
         self.lcdNumber_5.display(float(f"{v:.2f}"))                 # V Bus
         self.lcdNumber_12.display(float(f"{i_net:.1f}"))             # I Net (Cap)
-        self.lcdNumber_13.display(float(f"{i_loads[0]:.1f}"))        # Duty Cycle Càrrega 1 (%)
-        self.lcdNumber_14.display(float(f"{i_loads[1]:.1f}"))        # Duty Cycle Càrrega 2 (%)
-        self.lcdNumber_15.display(float(f"{i_loads[2]:.1f}"))        # Duty Cycle Càrrega 3 (%)
+        self.lcdNumber_13.display(float(f"{(i_loads[0] * 5) / max(v, 1.0):.1f}")) # I Load 1 (A)
+        self.lcdNumber_14.display(float(f"{(i_loads[1] * 5) / max(v, 1.0):.1f}")) # I Load 2 (A)
+        self.lcdNumber_15.display(float(f"{(i_loads[2] * 5) / max(v, 1.0):.1f}")) # I Load 3 (A)
 
         # Actualitzar indicadors visuals (LEDs Checkboxes)
         self.checkBox.setChecked(i_loads[0] > 0)     # Roig

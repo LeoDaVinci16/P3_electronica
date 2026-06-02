@@ -1,6 +1,8 @@
-\documentclass[twocolumn,10.5pt,a4paper]{article}
+\documentclass[11pt,a4paper]{article}
 
 \usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
 \usepackage[catalan]{babel}
 \usepackage{graphicx}
 \usepackage{amsmath}
@@ -8,6 +10,10 @@
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage{booktabs}
+\usepackage{multicol}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{microtype}
 \usepackage{caption}
 
 \geometry{margin=2.5cm, bottom=2.5cm, columnsep=1cm}
@@ -40,10 +46,10 @@
 
 
 \author{
-    Guillem Castillo i Arnau Coronado \\
+    Guillem Castillo Barrieras i Arnau Coronado Nadal \\
     \small Escola d'Enginyeria de Barcelona Est (EEBE) \\
     \small Universitat Politècnica de Catalunya (UPC) \\
-    \small \textit{Màster en Enginyeria Electrònica (PGE3)}
+    \small \textit{Processament i gestió electrònica d'energia elèctrica (PGE3)}
 }
 \date{1 de juny de 2026}
 
@@ -52,46 +58,75 @@
 \maketitle
 
 \begin{abstract}
-    Aquest article tècnic detalla el desenvolupament integral d'un sistema SCADA per a la gestió de tercer nivell d'una micro-xarxa híbrida en corrent continu (DC). El sistema emula una infraestructura energètica real composta per generació fotovoltaica (FV), connexió de suport a la xarxa elèctrica, emmagatzematge d'energia mitjançant condensadors de gran capacitat i càrregues controlades (LEDs). L'arquitectura del programa permet la commutació entre simulació pura, \textit{Hardware-in-the-Loop} (HIL) i operació física emulada. La política de control se centra en el manteniment de l'estabilitat del bus al voltant de 40V, aplicant algorismes de \textit{load shedding} robustos i una jerarquia de prioritats en el flux de potència gestionada des d'un microcontrolador ESP32 i una interfície PyQt5.
+    Aquest article tècnic detalla el desenvolupament integral d'un sistema SCADA per a la gestió de tercer nivell d'una micro-xarxa híbrida en corrent continu (DC). El sistema emula una infraestructura energètica real composta per generació fotovoltaica (FV), connexió de suport a la xarxa elèctrica, emmagatzematge d'energia i càrregues controlades. L'arquitectura del programa permet la commutació entre simulació pura, \textit{Hardware-in-the-Loop} (HIL) i operació física emulada. La política de control se centra en el manteniment de l'estabilitat del bus de contínua, aplicant algorismes de \textit{load shedding} robustos i una jerarquia de prioritats en el flux de potència. La microxarxa es gestiona des d'un servidor que executa els programes de python: de decisió estratègica, interfície d'usuari per activar les càrregues i comunicació amb el microcontrolador ESP32 que executa el control dels elements físics de la microxarxa.
+    \vspace{0.2cm}
 
     \textbf{Paraules clau:} \textit{Micro-xarxa, SCADA, Gestió de Tercer Nivell, ESP32, Filtrat per Mediana, Load Shedding.}
 \end{abstract}
 
-\section{Introducció i Objectius}
-El disseny de sistemes energètics intel·ligents requereix una supervisió que vagi més enllà del simple control local de convertidors. Aquest projecte aborda la implementació de la gestió de tercer nivell, la capa superior de la piràmide d'automatització, encarregada d'optimitzar l'estratègia global de la micro-xarxa.
+\tableofcontents
+\newpage
 
-L'objectiu principal és implementar un entorn capaç de gestionar el balanç energètic entre fonts de generació intermitent i càrregues de diferent criticitat. La complexitat resideix en la integració de components físics amb un model digital en temps real, permetent validar la robustesa de l'estratègia de control. Els reptes tecnològics inclouen el filtratge de senyals en entorns amb soroll de commutació, el control proporcional de la tensió de bus i la gestió eficient del flux de dades.
+\begin{multicols}{2}
 
-\section{Arquitectura del Sistema}
-La maqueta física que es mostra a la figura \ref{fig:planta_fisica} ha estat dissenyada per representar els quatre pilars fonamentals d'una micro-xarxa elèctrica intel·ligent:
-\begin{itemize}
-    \item \textbf{Generació:} Dues fonts de corrent controlades per tensió que emulen la producció fotovoltaica (FV) i el suport de la xarxa elèctrica.
-    \item \textbf{Emmagatzematge:} Un condensador electrolític de gran capacitat (12 mF) que actua com a pulmó energètic del bus DC.
-    \item \textbf{Càrregues:} Tres branques LED de diferent prioritat (Vermell, Blau, Verd).
-    \item \textbf{Element de Camp:} Un ESP32 encarregat de la digitalització del bus i l'execució de les ordres PWM i DAC.
-\end{itemize}
+    \section{Introducció i Objectius}
+    El disseny de sistemes energètics intel·ligents requereix una supervisió que vagi més enllà del simple control local de convertidors. Aquest projecte aborda la implementació de la gestió de tercer nivell, la capa superior de la piràmide d'automatització, encarregada d'optimitzar l'estratègia global de la micro-xarxa.
 
-\begin{figure}[h!]
-    \centering
-    \includegraphics[width=\linewidth]{planta.png}
-    \caption{Muntatge experimental de la planta física sobre protoboard.}
-    \label{fig:planta_fisica}
-\end{figure}
+    L'objectiu principal és implementar un entorn capaç de gestionar el balanç energètic de la microxarxa experimental de la figura \ref{fig:circuit}. Aquest sistema electronic emula una microxarxa elèctrica real composta per: fonts de generació d'energia intermitents (renovable FV i xarxa elèctrica de suport), emmagatzematge i càrregues de consum d'energia amb diferent criticitat. La complexitat resideix en la integració de components físics amb un model digital en temps real, permetent validar la robustesa de l'estratègia de control. Els reptes tecnològics inclouen el filtratge de senyals en entorns amb soroll de commutació, el control proporcional de la tensió de bus i la gestió eficient del flux de dades.
 
-\section{Adquisició i Tractament del Flux de Dades}
-La integritat del control de tercer nivell depèn de la precisió en la captura de dades i de la velocitat de resposta, gestionats a \texttt{control\_esp32.py}. El camí de la informació es detalla a continuació:
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=\linewidth]{circuit.png}
+        \caption{Esquema de la micro-xarxa implementada. D'esquerra a dreta: Font de corrent controlada per tensió (PV), font de corrent controlada per tenisó (Xarxa), Condensador, LEDs Roig (crític), Blau i Verd (no crítics).}
+        \label{fig:circuit}
+    \end{figure}
 
-\subsection{Mapeig de Pins i Etapa de Potència}
-\begin{itemize}
-    \item \textbf{Entrada (ADC 34):} Llegeix la tensió del bus mitjançant un divisor de tensió (factor 15.15).
-    \item \textbf{Generació (DAC 25/26):} Modulen la potència de les fonts solar i de xarxa respectivament.
-    \item \textbf{Actuació (PWM 2, 4, 5):} Controlen el consum dels LEDs. S'utilitza l'integrat \textbf{ULQ200x}, una matriu Darlington \textit{low-side} que aïlla l'ESP32 i permet gestionar càrregues sobre el bus de 50V amb precisió.
-\end{itemize}
+    \section{Arquitectura del Sistema}
 
-\subsection{Filtre de Mediana (Firmware)}
-Per netejar la dada del soroll de commutació PWM, el firmware de l'ESP32 (\texttt{uControl\_0.py}) implementa un filtre de mediana. El sistema pren 15 mostres de l'ADC, les ordena i selecciona el valor de la \textbf{posició 7}. A diferència d'una mitjana, que es veuria alterada per un sol pic de soroll, la mediana descarta els \textit{spikes} i garanteix una lectura estable per a la lògica de \textit{load shedding}.
+    \subsection{Planta Física (Hardware)}
+    La maqueta física de la figura \ref{fig:planta_fisica} ha estat dissenyada per representar els quatre pilars fonamentals d'una micro-xarxa elèctrica intel·ligent:
+    \begin{enumerate}[leftmargin=*, nosep]
+        \item \textbf{Generació:} Dues fonts de corrent controlades per tensió que emulen la producció fotovoltaica (FV) i el suport de la xarxa elèctrica. En realitat és un sol mòdul amb dues entrades de tensió i una sola sortida que és la suma de corrent a les dues fonts controlades, que conectem al bus DC.
+        \item \textbf{Emmagatzematge:} Un condensador electrolític de gran capacitat (12 mF) que actua com a pulmó energètic del bus DC.
+        \item \textbf{Càrregues:} Tres branques LED de diferent prioritat (Roig, Blau, Verd), que emulen les càrregues de consum de potència.
+        \item \textbf{Element de Camp:} Un ESP32 encarregat de la digitalització del bus i l'execució de les ordres PWM i DAC, i la comunicació amb el PC. A continuació es descriuen els pins de l'ESP32 utilitzats:
+              \begin{itemize}[leftmargin=*, nosep]
+                  \item \textbf{Entrada (ADC: 34):} Llegeix la tensió del bus mitjançant un divisor de tensió.
+                  \item \textbf{Generació (DAC: 25/26):} Modulen la tensió de control de les fonts solar i de xarxa respectivament.
+                  \item \textbf{Consum (PWM: 2, 4, 5):} Controlen el consum dels LEDs. S'utilitza l'integrat \textbf{ULQ200x}, una matriu Darlington \textit{low-side} que aïlla l'ESP32 i permet gestionar càrregues sobre el bus de 50V amb precisió.
+              \end{itemize}
+    \end{enumerate}
 
-\begin{lstlisting}[language=Python]
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=\linewidth]{planta.png}
+        \caption{Muntatge de la planta física sobre protoboard.}
+        \label{fig:planta_fisica}
+    \end{figure}
+
+    \subsection{Flux de dades (Software)}
+
+    L'arquitectura del programari permet commutar entre tres modes de funcionament sense alterar la lògica de control (\texttt{brain.py}):
+    \begin{itemize}
+        \item \textbf{Simulació Pura (\texttt{simulation.py}):} Validació teòrica amb el model matemàtic d'Euler.
+        \item \textbf{Mode Híbrid (HIL) (\texttt{hybrid.py}):} El PC calcula la física però tanca el bucle a través del hardware real (DAC a ADC), validant la latència i la quantificació.
+        \item \textbf{Hardware Real (\texttt{main.py}):} Operació directa sobre la planta física, on l'ADC dicta la realitat del bus.
+    \end{itemize}
+
+    El treball se centra en l'operació amb la planta física (mode hardware real). En aquest mode d'operació els programes de software que entren en acció son els següents:
+
+    \begin{itemize}
+        \item \texttt{uControl\_0.py} (L'Element de Camp): És el progama de microPython que esta instal·lat al ESP32. Llegeix els sensors (ADC) aplicant un filtre de mediana per eliminar el soroll, controla els transistors dels LEDs via PWM i les fonts via DAC. Intercaniva una trama de text pel port sèrie cada 10ms a través del \texttt{control\_esp32.py}.
+        \item \texttt{control\_esp32.py} (El Pont de Comunicació): Actua com a intèrpret. Obre el port sèrie, buida el buffer per evitar retards (lag) i converteix les cadenes de text de l'ESP32 en llistes de números de Python que el PC pot entendre. També empaqueta les ordres del PC cap a l'ESP32.
+        \item \texttt{main.py} (L'Orquestrador): És el fitxer executiu. Té un temporitzador (QTimer) que cada 50ms Crida a \texttt{read\_adc()} per obtenir la realitat física i a \texttt{send\_data()} per enviar les ordres provinents de \texttt{brain.py} a l'ESP32 a través del \texttt{control\_esp32.py}
+        \item \texttt{brain.py} (La Intel·ligència de 3r Nivell): Rep el voltatge del bus i executa l'algoritme de decisió que implementa les estratègies de control (\textit{load shedding, safety sink, control proporcional...})
+        \item \texttt{gui.py} i \texttt{ui.py} (La Interfície SCADA): ui.py és l'esquelet (creat amb Qt Designer) i gui.py és el programa que implementa la interfície. Gestiona els gràfics en temps real (pyqtgraph) i llegeix la posició dels sliders que l'usuari mou.
+    \end{itemize}
+
+    \subsection{Filtre de Mediana (Firmware)}
+    Per netejar la dada del soroll de commutació PWM, el firmware de l'ESP32 (\texttt{uControl\_0.py}) implementa un filtre de mediana. El sistema pren 15 mostres de l'ADC, les ordena i selecciona el valor de la posició 7. A diferència d'una mitjana, que es veuria alterada per un sol pic de soroll, la mediana descarta els \textit{spikes} i garanteix una lectura estable per a la lògica de \textit{load shedding}.
+
+    \begin{lstlisting}[language=Python]
 def read_stable(adc):
     samples = []
     for _ in range(15):
@@ -100,70 +135,62 @@ def read_stable(adc):
     return samples[7] 
 \end{lstlisting}
 
-\subsection{Gestió Asíncrona i Optimització del Buffer}
-Per evitar el \textit{lag} acumulat en les comunicacions sèrie, el PC realitza una \textbf{Gestió Asíncrona del Buffer}. En cada cicle d'execució de 50ms, el programa buida completament el buffer de recepció (\texttt{in\_waiting}) i processa exclusivament l'última línia vàlida. Aquesta optimització assegura que l'estratègia del \texttt{brain.py} reaccioni a temps real, evitant que el sistema prengui decisions basades en estats de bus obsolets.
+    \subsection{Gestió Asíncrona i Optimització del Buffer}
+    Per evitar el \textit{lag} acumulat en les comunicacions sèrie, el PC realitza una \textbf{Gestió Asíncrona del Buffer}. En cada cicle d'execució de 50ms, el programa buida completament el buffer de recepció (\texttt{in\_waiting}) i processa exclusivament l'última línia vàlida. Aquesta optimització assegura que l'estratègia del \texttt{brain.py} reaccioni a temps real, evitant que el sistema prengui decisions basades en estats de bus obsolets.
 
-\begin{lstlisting}[language=Python]
+    \begin{lstlisting}[language=Python]
 if self.ser.in_waiting > 0:
     raw_data = self.ser.read(self.ser.in_waiting).decode()
     lines = raw_data.strip().split('\n')
     latest_line = lines[-1] 
 \end{lstlisting}
 
-\section{Modes d'Operació}
-L'arquitectura del programari permet commutar entre tres modes de funcionament sense alterar la lògica de control (\texttt{brain.py}):
-\begin{itemize}
-    \item \textbf{Simulació Pura (\texttt{simulation.py}):} Validació teòrica amb el model matemàtic d'Euler.
-    \item \textbf{Mode Híbrid (HIL) (\texttt{hybrid.py}):} El PC calcula la física però tanca el bucle a través del hardware real (DAC a ADC), validant la latència i la quantificació.
-    \item \textbf{Hardware Real (\texttt{main.py}):} Operació directa sobre la planta física, on l'ADC dicta la realitat del bus.
-\end{itemize}
+    \section{Estratègies de Control i Emulació Temporal}
+    El mòdul \texttt{brain.py} actua com l'òrgan de decisió central, aplicant les següents consignes:
 
-\section{Estratègies de Control i Emulació Temporal}
-El mòdul \texttt{brain.py} actua com l'òrgan de decisió central, aplicant les següents consignes:
+    \subsection{Manteniment de la tensió de bus}
+    La política central és garantir el nivell de tensió del bus DC. Com que tots els elements estan acoblats al mateix bus, el sistema monitoritza el voltatge de bus procedent de l'ESP32 i només activa la injecció de corrent de la xarxa quan la tensió del bus cau per sota dels 35V.
 
-\subsection{Manteniment de la tensió de bus}
-La política central és garantir que la tensió del bus no caigui mai dels \textbf{35V}. Com que tots els elements estan acoblats al mateix bus DC, el sistema monitoritza el voltatge real procedent de l'ESP32 i només activa la injecció de corrent de la xarxa quan la suma de la generació solar i l'energia emmagatzemada al condensador no és suficient per equilibrar el balanç de potències.
+    La prioritat de fonts es gestiona de forma inherent pel balanç de corrents del bus:
+    \begin{itemize}
+        \item \textbf{Solar:} Injecta corrent al bus sempre que hi ha irradiància disponible (basat en el document \texttt{irradiancia.csv}), sent la font preferent per cobrir el consum i carregar el condensador.
+        \item \textbf{Condensador:} Actua com a pulmó energètic. Si la generació FV és inferior al consum, el condensador subministra la diferència de corrent de forma natural, provocant una descàrrega i la conseqüent caiguda de tensió del bus.
+        \item \textbf{Xarxa:} El control de tercer nivell només permet la injecció activa de corrent des de la xarxa quan la tensió del bus cau per sota dels 35V (\texttt{V\_TARGET\_GRID}), actuant com a darrer recurs per evitar el col·lapse del servei crític.
+    \end{itemize}
 
-La prioritat de fonts es gestiona de forma inherent pel balanç de corrents del bus:
-\begin{itemize}
-    \item \textbf{Solar:} Injecta corrent al bus sempre que hi ha irradiància disponible (basat en el document \texttt{irradiancia.csv}), sent la font preferent per cobrir el consum i carregar el condensador.
-    \item \textbf{Condensador:} Actua com a pulmó energètic. Si la generació FV és inferior al consum, el condensador subministra la diferència de corrent de forma natural, provocant una descàrrega i la conseqüent caiguda de tensió del bus.
-    \item \textbf{Xarxa:} El control de tercer nivell només permet la injecció activa de corrent des de la xarxa quan la tensió del bus cau per sota dels 35V, actuant com a darrer recurs per evitar el col·lapse del servei crític.
-\end{itemize}
-
-\begin{lstlisting}[language=Python]
+    \begin{lstlisting}[language=Python]
 # Suport automatic per mantenir el Bus 
 error_v = self.V_TARGET_GRID - current_vbus
 p_grid_auto = max(0, error_v * self.KP_GRID) if served[0] else 0
 \end{lstlisting}
 
-\subsection{Estratègia de Gestió de Càrregues (Load Shedding)}
-El sistema classifica les càrregues segons la seva criticitat per protegir l'estabilitat del sistema en cas de baixa disponibilitat energètica:
+    \subsection{Estratègia de Gestió de Càrregues (Load Shedding)}
+    El sistema classifica les càrregues segons la seva criticitat per protegir l'estabilitat del sistema en cas de baixa disponibilitat energètica:
 
-La micro-xarxa prioritza la continuïtat del servei de la càrrega crítica (LED roig), la qual es manté alimentada de forma permanent. El \textit{load shedding} actua de forma seqüencial sobre les càrregues no crítiques:
-\begin{enumerate}
-    \item \textbf{Zona Operativa ($>38$V):} Totes les càrregues actives.
-    \item \textbf{Desconnexió preventiva:} Les càrregues no crítiques (LED blau i verd) es desconnecten immediatament. L'objectiu és aturar la descàrrega del condensador i prioritzar l'energia restant per a la càrrega crítica.
-          \begin{itemize}
-              \item Llindar 1 (38V): Es desconnecta la càrrega Verda.
-              \item Llindar 2 (36V): Es desconnecta la càrrega Blava.
-          \end{itemize}
+    La micro-xarxa prioritza la continuïtat del servei de la càrrega crítica (LED roig), la qual es manté alimentada de forma permanent. El \textit{load shedding} actua de forma seqüencial sobre les càrregues no crítiques:
+    \begin{enumerate}
+        \item \textbf{Zona Operativa ($>38$V):} Totes les càrregues actives.
+        \item \textbf{Desconnexió preventiva:} Les càrregues no crítiques (LED blau i verd) es desconnecten immediatament. L'objectiu és aturar la descàrrega del condensador i prioritzar l'energia restant per a la càrrega crítica.
+              \begin{itemize}
+                  \item Llindar 1 (38V): Es desconnecta la càrrega Verda.
+                  \item Llindar 2 (36V): Es desconnecta la càrrega Blava.
+              \end{itemize}
 
-          \begin{lstlisting}[language=Python]
+              \begin{lstlisting}[language=Python]
 # Sequencia de desconnexio (Load Shedding)
 if current_vbus < 38.0: served[2] = False # Shed Verd
 if current_vbus < 36.0: served[1] = False # Shed Blau
 \end{lstlisting}
 
-    \item \textbf{Reserva Crítica:} Quan es solicita, LED roig es manté connectat de forma ininterrompuda.
-\end{enumerate}
+        \item \textbf{Reserva Crítica:} Quan es solicita, LED roig es manté connectat de forma ininterrompuda; activant la xarxa si cal.
+    \end{enumerate}
 
 
 
-\subsection{Protecció Avançada: Safety Sink}
-Si la generació solar és màxima i no hi ha consum, la tensió del bus pot pujar ràpidament. A 45V, el \texttt{brain.py} activa el \textbf{Safety Sink}: força el LED verd al 100\% per drenar energia. Si la tensió persisteix per sobre de 45V, el DAC solar es posa a 0 per tallar la producció (analogia de desconnectar el camp fotovoltaic).
+    \subsection{Protecció Avançada: Safety Sink}
+    Si la generació solar és màxima i no hi ha consum, la tensió del bus pot pujar ràpidament. A 45V, el \texttt{brain.py} activa el \textbf{Safety Sink}: força el LED verd al 100\% per drenar energia. Si la tensió persisteix per sobre de 45V, el DAC solar es posa a 0 per tallar la producció (analogia de desconnectar el camp fotovoltaic).
 
-\begin{lstlisting}[language=Python]
+    \begin{lstlisting}[language=Python]
 # Estrategia de dissipacio d'excedents
 if current_vbus > 45.0:
     served[2] = True      # Forcem dissipacio (LED Verd)
@@ -173,22 +200,24 @@ if current_vbus > 45.0:
 \end{lstlisting}
 
 
-\section{Anàlisi i Resultats}
-El resultat principal d'aquest projecte és l'emulació exitosa d'un escenari energètic complex. El sistema no es limita a un control de laboratori, sinó que se sotmet a una validació climàtica real a partir de les dades històriques d'irradiància solar a Barcelona (2023).
+    \section{Anàlisi i Resultats}
+    El resultat principal d'aquest projecte és l'emulació exitosa d'un escenari energètic complex. El sistema no es limita a un control de laboratori, sinó que se sotmet a una validació climàtica real a partir de les dades històriques d'irradiància solar a Barcelona (2023).
 
-\subsection{Validació amb Dades Reals i Temps Virtual}
-L'execució del programa \texttt{main.py} processa el fitxer \texttt{irradiancia.csv}, que conté dades horàries reals de Barcelona durant l'any 2023. Aquesta lògica implica que cada 50ms de temps real, al sistema passa 1 hora de temps virtual. El factor d'acceleració de l'emulació es calcula mitjançant el quocient entre el pas virtual ($\Delta t_{Virtual} = 3600\text{ s}$) i el pas real del bucle ($\Delta t_{Real} = 0,05\text{ s}$):
-\begin{equation}
-    Factor = \frac{\Delta t_{Virtual}}{\Delta t_{Real}} = \frac{3600\text{ s}}{0,05\text{ s}} = 72.000
-\end{equation}
-Això permet observar en pocs minuts com es comportaria la micro-xarxa davant de variacions estacionals, dies ennuvolats o pics de radiació estivals:
-\begin{itemize}
-    \item 1 segon real equival a 72.000 segons virtuals (aprox. 20 hores).
-    \item Simular un dia sencer (24 hores) triga només 1,2 segons.
-    \item Emular un any sencer (8.760 hores) requereix aproximadament 7,3 minuts de temps real.
-\end{itemize}
+    \subsection{Validació amb Dades Reals i Temps Virtual}
+    L'execució del programa \texttt{main.py} processa el fitxer \texttt{irradiancia.csv}, que conté dades horàries reals de Barcelona durant l'any 2023. Aquesta lògica implica que cada 50ms de temps real, al sistema passa 1 hora de temps virtual. El factor d'acceleració de l'emulació es calcula mitjançant el quocient entre el pas virtual ($\Delta t_{Virtual} = 3600\text{ s}$) i el pas real del bucle ($\Delta t_{Real} = 0,05\text{ s}$):
+    \begin{equation}
+        Factor = \frac{\Delta t_{Virtual}}{\Delta t_{Real}} = \frac{3600\text{ s}}{0,05\text{ s}} = 72.000
+    \end{equation}
+    Això permet observar en pocs minuts com es comportaria la micro-xarxa davant de variacions estacionals, dies ennuvolats o pics de radiació estivals:
+    \begin{itemize}[leftmargin=*, nosep]
+        \item 1 segon real equival a 72.000 segons virtuals (aprox. 20 hores).
+        \item Simular un dia sencer (24 hores) triga només 1,2 segons.
+        \item Emular un any sencer (8.760 hores) requereix aproximadament 7,3 minuts de temps real.
+    \end{itemize}
 
-\begin{lstlisting}[language=Python]
+    Tal i com s'observa a la figura \ref{fig:irradiancia}, la gràfica de l'SCADA mostra en pantalla 200 hores, es a dir, una mica més d'una setmana real.
+
+    \begin{lstlisting}[language=Python]
 # Carrega de dades historiques (brain._load_solar_csv)
 def _load_solar_csv(self):
     data = []
@@ -204,22 +233,34 @@ ts, p_solar = self.solar_data[self.idx]
 self.idx = (self.idx + 1) % len(self.solar_data)
 \end{lstlisting}
 
-\subsection{Interfície SCADA i Monitorització en Temps Real}
-En executar el mòdul \texttt{main.py}, el sistema desplega de forma automàtica una Interfície Gràfica d'Usuari (GUI) definida als fitxers \texttt{gui.py} i \texttt{ui.py}, els quals han estat desenvolupats mitjançant l'eina Qt Designer. L'arquitectura de la interfície s'organitza en dues pantalles principals de visualització i control:
-\begin{itemize}
-    \item Panell de Control SCADA: Aquesta pantalla permet la interacció directa de l'usuari amb la planta. Inclou tres sliders interactius, un per a cada branca LED (roig, blau i verd), que actuen com a sol·licituds de demanda de consum. En desplaçar aquests controls, el sistema tradueix la posició a un senyal PWM que varia de forma lineal des del 0% fins al 100% del cicle de treball, permetent una regulació precisa de la potència consumida per cada càrrega
-    \item Monitorització Gràfica: La segona pantalla integra gràfics dinàmics basats en la llibreria pyqtgraph. Aquests gràfics mostren en temps real l'evolució de la tensió del bus, l'aportació de cada font i els esdeveniments de load shedding, proporcionant una visió clara del balanç de potències i l'estabilitat del sistema sota la política dels 40V.
-\end{itemize}
+    D'altra banda, la configuració del sistema defineix una potència pic instal·lada d'1 kW. Això es dedueix de l'escalat realitzat al mòdul \texttt{brain.py}, on els valors d'irradiància (expressats en $W/m^2$ al fitxer CSV) es normalitzen respecte a una radiació estàndard de $1000 W/m^2$ per a la generació del senyal DAC. Atès que el SCADA tracta aquestes unitats directament com a Watts per al càlcul del balanç, s'emula una planta fotovoltaica d'1 $kW_p$ de potència nominal (sense considerar les perdues d'eficiència en la placa fotovoltaica).
 
-ESPAI PER POSAR: Captura de pantalla de la pantalla SCADA amb els sliders de control Descripció: Imatge de la interfície on es vegin els controls de demanda i els visualitzadors de duty cycle.
-ESPAI PER POSAR: Captura de pantalla dels gràfics de visualització en temps real Descripció: Gràfics de pyqtgraph mostrant la resposta del bus davant el control dels sliders.
-Aquesta integració entre la gestió de dades històriques i el control físic immediat demostra l'eficàcia del sistema per predir i gestionar el comportament d'una micro-xarxa real en un entorn ciber-físic segur.
-\textbf{[ESPAI PER MOSTRAR EL GUI I LA IRRADIACIÓ]}
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=\linewidth]{irradiancia.png}
+        \caption{Captura de pantalla de la gràfica de generació de l'SCADA. Es mostra la tensió del DAC25 per això l'escala va de 0 a 3.3 V, que es la tensió de control de la font de corrent (PV)}
+        \label{fig:irradiancia}
+    \end{figure}
 
+    \subsection{Interfície SCADA i Monitorització en Temps Real}
+    En executar el mòdul \texttt{main.py}, el sistema desplega de forma automàtica una Interfície Gràfica d'Usuari (GUI) definida als fitxers \texttt{gui.py} i \texttt{ui.py}, els quals han estat desenvolupats mitjançant l'eina Qt Designer. L'arquitectura de la interfície s'organitza en dues pantalles principals de visualització i control:
+    \begin{itemize}[leftmargin=*, nosep]
+        \item \textbf{Panell de Control SCADA:} La pantalla mostrada a la figura \ref{fig:scada} permet la interacció directa de l'usuari amb la planta. Inclou tres sliders interactius, un per a cada branca LED (roig, blau i verd), que actuen com a sol·licituds de demanda de consum. En desplaçar aquests controls, el sistema tradueix la posició a un senyal PWM que varia de forma lineal des del 0\% fins al 100\% del cicle de treball, permetent una regulació precisa de la potència consumida per cada càrrega
+        \item \textbf{Monitorització Gràfica:} La segona pantalla integra gràfics dinàmics basats en la llibreria pyqtgraph. Aquests gràfics mostren en temps real l'evolució de la tensió del bus, l'aportació de cada font i els esdeveniments de load shedding, proporcionant una visió clara del balanç de potències i l'estabilitat del bus.
+    \end{itemize}
 
-\section{Conclusions}
-Aquest projecte ha permès dissenyar un banc de proves funcional per a l'emulació de micro-xarxes. La separació de la lògica de decisió \texttt{brain.py} de la capa física permet que el sistema sigui altament escalable; per exemple, canviant l'ESP32 per un PLC industrial sense haver de reescriure la política energètica.
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=\linewidth]{scada.png}
+        \caption{Captura de pantalla de la interfície gràfica de control SCADA, amb els sliders de control de càrregues i els lcdNumbers que mostren els valors de la producció, consum i emmagatzematge en diferents unitats (W, mA, \%...).}
+        \label{fig:scada}
+    \end{figure}
 
-L'ús de tècniques avançades com el filtratge per mediana al firmware i la gestió de buffer sèrie al SCADA ha estat clau per obtenir un control estable i sense retards. S'ha demostrat que la combinació de dades històriques reals i control físic en temps real és una eina poderosa per predir l'eficàcia de polítiques de \textit{load shedding}. En definitiva, el projecte aconsegueix integrar de forma eficient el processament de dades, l'electrònica de potència i les estratègies de gestió de xarxes intel·ligents (\textit{Smart Grids}), garantint sempre el subministrament a la càrrega crítica i la seguretat de la instal·lació. L'emulació de la microxarxa ha permès utilitzar estrategies reals en un sistema electrònic segur a molt baixa tensió.
+    \section{Conclusions}
+    Aquest projecte ha permès dissenyar un banc de proves funcional per a l'emulació de micro-xarxes. La separació de la lògica de decisió \texttt{brain.py} de la capa física permet que el sistema sigui altament escalable; per exemple, canviant l'ESP32 per un PLC industrial sense haver de reescriure la política energètica.
+
+    L'ús de tècniques avançades com el filtratge per mediana al firmware i la gestió de buffer sèrie al SCADA ha estat clau per obtenir un control estable i sense retards. S'ha demostrat que la combinació de dades històriques reals i control físic en temps real és una eina poderosa per predir l'eficàcia de polítiques de \textit{load shedding}. En definitiva, el projecte aconsegueix integrar de forma eficient el processament de dades, l'electrònica de potència i les estratègies de gestió de xarxes intel·ligents (\textit{Smart Grids}), garantint sempre el subministrament a la càrrega crítica i la seguretat de la instal·lació. L'emulació de la microxarxa ha permès utilitzar estrategies reals en un sistema electrònic segur a molt baixa tensió.
+
+\end{multicols}
 
 \end{document}
